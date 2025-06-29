@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "808473473804",
+    "project_id": "the-tumaric-indian-cusine",
+    "storage_bucket": "the-tumaric-indian-cusine.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:808473473804:android:71afc6e0f49bc3d7a78f29",
+        "android_client_info": {
+          "package_name": "com.example.the_tumeric_papplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqZjSgAuSdPP6Ww5YqekR7Ip1bM6j9waI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
