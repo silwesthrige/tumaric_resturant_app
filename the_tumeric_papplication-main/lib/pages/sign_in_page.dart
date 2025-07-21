@@ -1,17 +1,29 @@
 import 'package:flutter/material.dart';
-import 'package:the_tumeric_papplication/pages/sign_up_page.dart';
+import 'package:the_tumeric_papplication/models/user_model.dart';
+
+import 'package:the_tumeric_papplication/services/auth.dart';
+import 'package:the_tumeric_papplication/services/user_services.dart';
 
 import 'package:the_tumeric_papplication/shared/custom_button.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 
 class SignInPage extends StatefulWidget {
-  const SignInPage({super.key});
+  final Function toggle;
+  const SignInPage({super.key, required this.toggle});
 
   @override
   State<SignInPage> createState() => _SignInPageState();
 }
 
 class _SignInPageState extends State<SignInPage> {
+  final AuthServices _auth = AuthServices();
+
+  //form key
+  final _formKey = GlobalKey<FormState>();
+
+  String email = "";
+  String password = "";
+  String error = "";
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -46,6 +58,7 @@ class _SignInPageState extends State<SignInPage> {
                   Padding(
                     padding: const EdgeInsets.all(15),
                     child: Form(
+                      key: _formKey,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: Column(
@@ -61,8 +74,18 @@ class _SignInPageState extends State<SignInPage> {
                             ),
                             SizedBox(height: 20),
                             TextFormField(
+                              validator:
+                                  (value) =>
+                                      value?.isEmpty == true
+                                          ? "Enter a valid Username"
+                                          : null,
+                              onChanged: (value) {
+                                setState(() {
+                                  email = value;
+                                });
+                              },
                               decoration: InputDecoration(
-                                hintText: "Username",
+                                hintText: "Email",
                                 filled: true,
                                 fillColor: Colors.white,
                                 focusColor: Colors.white,
@@ -73,6 +96,16 @@ class _SignInPageState extends State<SignInPage> {
                             ),
                             SizedBox(height: 15),
                             TextFormField(
+                              validator:
+                                  (value) =>
+                                      value!.length < 6
+                                          ? "Enter a valid Password"
+                                          : null,
+                              onChanged: (value) {
+                                setState(() {
+                                  password = value;
+                                });
+                              },
                               obscureText: true,
                               decoration: InputDecoration(
                                 hintText: "Password",
@@ -86,11 +119,58 @@ class _SignInPageState extends State<SignInPage> {
                               ),
                             ),
                             SizedBox(height: 15),
-                            CustumButton(
-                              buttonName: "Login",
-                              buttonColor: kMainOrange,
+                            GestureDetector(
+                              onTap: () async {
+                                if (_formKey.currentState!.validate()) {
+                                  UserModel? result = await _auth
+                                      .signInEmailAndPassword(email, password);
+                                  if (result == null) {
+                                    setState(() {
+                                      error = "Could Not Sign In";
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text(error),
+                                          backgroundColor: Colors.green,
+                                          behavior: SnackBarBehavior.floating,
+                                          margin: EdgeInsets.all(16),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    });
+                                  } else {
+                                    setState(() {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        SnackBar(
+                                          content: Text("Login Successfully!"),
+                                          backgroundColor: Colors.green,
+                                          behavior: SnackBarBehavior.floating,
+                                          margin: EdgeInsets.all(16),
+                                          duration: Duration(seconds: 2),
+                                        ),
+                                      );
+                                    });
+
+                                    
+                                  }
+                                }
+                              },
+                              child: CustumButton(
+                                buttonName: "Login",
+                                buttonColor: kMainOrange,
+                              ),
                             ),
                             SizedBox(height: 15),
+                            // Text(
+                            //   error,
+                            //   style: TextStyle(
+                            //     fontWeight: FontWeight.w700,
+                            //     color: Colors.red,
+                            //   ),
+                            // ),
                             Row(
                               children: [
                                 Text(
@@ -103,12 +183,7 @@ class _SignInPageState extends State<SignInPage> {
                                 SizedBox(width: 10),
                                 GestureDetector(
                                   onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => SignUpPage(),
-                                      ),
-                                    );
+                                    widget.toggle();
                                   },
                                   child: Container(
                                     child: Text(

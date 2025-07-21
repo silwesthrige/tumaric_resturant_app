@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/Home_page_bottum.dart';
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/cart_page.dart';
+import 'package:the_tumeric_papplication/pages/navigate_pages.dart/cartpage.dart';
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/offer_page.dart';
+
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/profile_page.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 
@@ -54,8 +56,8 @@ class _HomePageState extends State<HomePage> {
                 label: "Cart",
               ),
               BottomNavigationBarItem(
-                icon: Icon(Icons.local_fire_department_sharp),
-                label: "Offer",
+                icon: Icon(Icons.local_fire_department_rounded),
+                label: "offers",
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person),

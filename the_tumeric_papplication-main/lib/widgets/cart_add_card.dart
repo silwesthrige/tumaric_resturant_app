@@ -6,6 +6,7 @@ class CaertAddCard extends StatelessWidget {
   final String title;
   final String disc;
   final double price;
+  final VoidCallback? onDelete; // Add this optional callback
 
   const CaertAddCard({
     super.key,
@@ -13,13 +14,13 @@ class CaertAddCard extends StatelessWidget {
     required this.title,
     required this.disc,
     required this.price,
+    this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
         color: kmainWhite,
@@ -59,7 +60,6 @@ class CaertAddCard extends StatelessWidget {
                 ),
                 Container(
                   width: 160,
-
                   child: Text(
                     overflow: TextOverflow.ellipsis,
                     maxLines: 2,
@@ -71,10 +71,9 @@ class CaertAddCard extends StatelessWidget {
                     ),
                   ),
                 ),
-
                 Container(
                   child: Text(
-                    "\$ ${100.00.toString()}",
+                    "\$ ${price.toStringAsFixed(2)}", // Use actual price here
                     style: TextStyle(
                       fontSize: 18,
                       color: kmainGreen,
@@ -85,14 +84,20 @@ class CaertAddCard extends StatelessWidget {
               ],
             ),
             SizedBox(width: 5),
-            Icon(
-              Icons.close,
-              color: kmainBlack,
-              weight: 40,
-              size: 20,
-              shadows: [
-                Shadow(color: kmainBlack, blurRadius: 2, offset: Offset(0, 1)),
-              ],
+            GestureDetector(
+              onTap: onDelete, // Call delete callback if provided
+              child: Icon(
+                Icons.close,
+                color: kmainBlack,
+                size: 20,
+                shadows: [
+                  Shadow(
+                    color: kmainBlack,
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

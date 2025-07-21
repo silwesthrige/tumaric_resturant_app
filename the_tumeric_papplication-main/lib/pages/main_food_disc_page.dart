@@ -4,7 +4,21 @@ import 'package:the_tumeric_papplication/widgets/add_to_cart_button.dart';
 import 'package:the_tumeric_papplication/widgets/half_full_indicatoe.dart';
 
 class MainFoodDiscPage extends StatefulWidget {
-  const MainFoodDiscPage({super.key});
+  final String title;
+  final String disc;
+  final String imageUrl;
+  final double price;
+
+  final double time;
+  const MainFoodDiscPage({
+    super.key,
+    required this.title,
+    required this.disc,
+    required this.imageUrl,
+    required this.price,
+
+    required this.time,
+  });
 
   @override
   State<MainFoodDiscPage> createState() => _MainFoodDiscPageState();
@@ -17,7 +31,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage> {
       appBar: AppBar(
         title: Center(
           child: Text(
-            "Chicken Biriyani",
+            widget.title,
             style: TextStyle(fontWeight: FontWeight.w500),
           ),
         ),
@@ -50,14 +64,14 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: Image.network(
-                            "https://images.rawpixel.com/image_800/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDI0LTA3L2FuZ3VzdGVvd19hX3Bob3RvX29mX2FfY2hpY2tlbl9oYW5kaV9iaXJ5YW5pX3NpZGVfdmlld19pc29sYXRlZF85ZmZjNjI3MC05M2IzLTQ3NDMtYjllYS05OGE2NzEwMjFkZThfMS5qcGc.jpg",
+                            widget.imageUrl,
                             fit: BoxFit.contain,
                           ),
                         ),
                       ),
                       SizedBox(height: 20),
                       Text(
-                        "Chicken Biriyani",
+                        widget.title,
                         style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.w600,
@@ -66,10 +80,10 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage> {
                       ),
                       Row(
                         children: [
-                          Icon(Icons.star, color: kMainOrange),
+                          Icon(Icons.timer, color: Colors.grey),
                           SizedBox(width: 5),
                           Text(
-                            "4.2  -  20 min",
+                            "${widget.time} min",
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -81,7 +95,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage> {
                       SizedBox(height: 15),
 
                       Text(
-                        "Discriptiopn ishdhakjsd ksadjkajsd kjasdasd wadawda awdawdawd wadawdawd awdawdawd awdawdawd wadawdaw dawdawdwa dawdawdawd awdawdwad wadawdwad awdawdaw dawdawd",
+                        widget.disc,
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w500,
@@ -92,6 +106,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage> {
 
                       Row(children: [HalfFullIndicatoe()]),
                       SizedBox(height: 50),
+                      SizedBox(height: 160),
                     ],
                   ),
                 ],

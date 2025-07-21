@@ -26,8 +26,8 @@ class _PramotionCardState extends State<PramotionCard> {
             child: PageView(
               controller: _controller,
               children: [
-                Image.asset("assets/images/offer.jpg", fit: BoxFit.cover),
-                Image.asset("assets/images/offer.jpg", fit: BoxFit.cover),
+                Image.asset("assets/images/Cover1.png", fit: BoxFit.cover),
+                Image.asset("assets/images/Cover.png", fit: BoxFit.cover),
                 Image.asset("assets/images/offer.jpg", fit: BoxFit.cover),
               ],
             ),
