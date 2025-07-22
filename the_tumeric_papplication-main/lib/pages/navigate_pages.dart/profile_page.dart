@@ -5,8 +5,8 @@ import 'package:the_tumeric_papplication/services/auth.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+class ProfilePageOld extends StatelessWidget {
+  const ProfilePageOld({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -5,6 +5,7 @@ import 'package:the_tumeric_papplication/pages/navigate_pages.dart/cartpage.dart
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/offer_page.dart';
 
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/profile_page.dart';
+import 'package:the_tumeric_papplication/pages/navigate_pages.dart/profile_page_new.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 
 class HomePage extends StatefulWidget {
