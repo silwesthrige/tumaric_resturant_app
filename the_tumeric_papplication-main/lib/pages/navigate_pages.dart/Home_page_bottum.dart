@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:the_tumeric_papplication/models/user_model.dart';
 
 import 'package:the_tumeric_papplication/pages/main_food_disc_page.dart';
 import 'package:the_tumeric_papplication/reuse_component/pramotion_card.dart';
 
 import 'package:the_tumeric_papplication/services/food_services.dart';
+import 'package:the_tumeric_papplication/services/user_services.dart';
 
 import 'package:the_tumeric_papplication/widgets/main_food_card.dart';
 import 'package:the_tumeric_papplication/widgets/mini_card_list_view.dart';
@@ -26,6 +28,7 @@ class _HomePageBottumState extends State<HomePageBottum>
   @override
   void initState() {
     super.initState();
+    fetchUserData();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -56,6 +59,31 @@ class _HomePageBottumState extends State<HomePageBottum>
     _fadeController.dispose();
     _slideController.dispose();
     super.dispose();
+  }
+
+  final UserServices _userServices = UserServices();
+  UserModel? currentUser;
+  bool isLoading = true;
+
+  Future<void> fetchUserData() async {
+    setState(() {
+      isLoading = true;
+    });
+    try {
+      // Use the stream to listen for real-time updates or just get the first value
+      final userStream = _userServices.getCurrentUserDetails();
+      currentUser = await userStream;
+    } catch (e) {
+      print("Error fetching user data: $e");
+      // Handle error, e.g., show a snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load profile data: $e')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -137,6 +165,7 @@ class _HomePageBottumState extends State<HomePageBottum>
   }
 
   Widget _buildWelcomeHeader() {
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
@@ -180,7 +209,7 @@ class _HomePageBottumState extends State<HomePageBottum>
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
-                    "Delivering to: NIBM Kurunegala",
+                    "",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 14,
