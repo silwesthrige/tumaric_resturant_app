@@ -6,9 +6,11 @@ class FoodDetailModel {
   final double price;
   final double cookedTime;
   final String? foodId;
+  final String? status;
 
   FoodDetailModel({
     this.foodId,
+    this.status,
     required this.foodName,
     required this.discription,
     required this.imageUrl,
@@ -26,6 +28,7 @@ class FoodDetailModel {
       price: (docs["price"] as num).toDouble(),
       cookedTime: (docs["cookedTime"] as num).toDouble(),
       shortDisc: docs["shortDisc"],
+      status: docs["status"],
     );
   }
   Map<String, dynamic> toJson() {

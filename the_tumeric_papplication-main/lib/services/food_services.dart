@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
-import 'package:the_tumeric_papplication/services/user_services.dart';
+
 
 class FoodServices {
   final CollectionReference _FoodCollection = FirebaseFirestore.instance

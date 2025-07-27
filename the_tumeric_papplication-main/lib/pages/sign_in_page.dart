@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
+import 'package:the_tumeric_papplication/pages/home_page.dart';
 
 import 'package:the_tumeric_papplication/services/auth.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
@@ -27,6 +28,30 @@ class _SignInPageState extends State<SignInPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          TextButton(
+            onPressed: () {
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (context) {
+              //       return HomePage();
+              //     },
+              //   ),
+              // );
+            },
+            child: Text(
+              "Skip",
+              style: TextStyle(
+                color: kMainOrange,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -153,8 +178,6 @@ class _SignInPageState extends State<SignInPage> {
                                         ),
                                       );
                                     });
-
-                                    
                                   }
                                 }
                               },

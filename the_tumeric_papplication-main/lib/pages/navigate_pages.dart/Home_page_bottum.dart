@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:the_tumeric_papplication/models/catogary_model.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 
 import 'package:the_tumeric_papplication/pages/main_food_disc_page.dart';
 import 'package:the_tumeric_papplication/reuse_component/pramotion_card.dart';
+import 'package:the_tumeric_papplication/services/catogary_service.dart';
 
 import 'package:the_tumeric_papplication/services/food_services.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
@@ -28,6 +30,7 @@ class _HomePageBottumState extends State<HomePageBottum>
   @override
   void initState() {
     super.initState();
+    _loadUserDetails();
     fetchUserData();
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -65,6 +68,18 @@ class _HomePageBottumState extends State<HomePageBottum>
   UserModel? currentUser;
   bool isLoading = true;
 
+  String? _userAddress;
+  void _loadUserDetails() async {
+    final user =
+        await UserServices().getCurrentUserDetails(); // or your service class
+    if (user != null && mounted) {
+      setState(() {
+        _userAddress =
+            user.address; // change this if your field is named differently
+      });
+    }
+  }
+
   Future<void> fetchUserData() async {
     setState(() {
       isLoading = true;
@@ -89,7 +104,7 @@ class _HomePageBottumState extends State<HomePageBottum>
   @override
   Widget build(BuildContext context) {
     final foodServices = FoodServices();
-
+    final catogaryService = CatogaryService();
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: _buildAppBar(),
@@ -113,7 +128,7 @@ class _HomePageBottumState extends State<HomePageBottum>
                   _buildPromotionsSection(),
 
                   // Categories Section
-                  _buildCategoriesSection(foodServices),
+                  _buildCategoriesSection(),
 
                   // Popular Section
                   _buildPopularSection(foodServices),
@@ -165,7 +180,6 @@ class _HomePageBottumState extends State<HomePageBottum>
   }
 
   Widget _buildWelcomeHeader() {
-    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: const BoxDecoration(
@@ -207,9 +221,9 @@ class _HomePageBottumState extends State<HomePageBottum>
               children: [
                 const Icon(Icons.location_on, color: Colors.white, size: 20),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    "",
+                    _userAddress ?? "Loading address...",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 14,
@@ -291,7 +305,7 @@ class _HomePageBottumState extends State<HomePageBottum>
     );
   }
 
-  Widget _buildCategoriesSection(FoodServices foodServices) {
+  Widget _buildCategoriesSection() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -306,10 +320,10 @@ class _HomePageBottumState extends State<HomePageBottum>
             ),
           ),
           const SizedBox(height: 16),
-          Container(
+          SizedBox(
             height: 120,
-            child: StreamBuilder(
-              stream: foodServices.getFood(),
+            child: StreamBuilder<List<CatogaryModel>>(
+              stream: CatogaryService().getCatogary(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(
@@ -324,14 +338,31 @@ class _HomePageBottumState extends State<HomePageBottum>
                 } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return _buildErrorWidget("No categories available");
                 } else {
-                  final foods = snapshot.data!;
-                  final miniCardFoods = foods.take(5).toList();
-                  return MiniCardListView(miniFoods: miniCardFoods);
+                  final categories = snapshot.data!;
+                  return MiniCardListView(catogarys: categories);
                 }
               },
             ),
           ),
           const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  // Helper method for error display
+  Widget _buildErrorWidget(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline, color: Colors.red, size: 48),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(color: Colors.red, fontSize: 16),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -402,6 +433,7 @@ class _HomePageBottumState extends State<HomePageBottum>
                 return _buildErrorWidget("No dishes available");
               } else {
                 final foods = snapshot.data!;
+
                 return _buildFoodGrid(foods);
               }
             },
@@ -440,10 +472,12 @@ class _HomePageBottumState extends State<HomePageBottum>
   }
 
   Widget _buildFoodGrid(List foods) {
+    final availableFoods =
+        foods.where((food) => food.status == 'available').toList();
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: foods.length,
+      itemCount: availableFoods.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 16.0,
@@ -451,7 +485,8 @@ class _HomePageBottumState extends State<HomePageBottum>
         childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
-        final food = foods[index];
+        final food = availableFoods[index];
+
         return AnimatedContainer(
           duration: Duration(milliseconds: 300 + (index * 100)),
           curve: Curves.easeOutBack,
@@ -481,6 +516,7 @@ class _HomePageBottumState extends State<HomePageBottum>
                       pageBuilder:
                           (context, animation, secondaryAnimation) =>
                               MainFoodDiscPage(
+                                foodId: food.foodId,
                                 title: food.foodName,
                                 disc: food.discription,
                                 imageUrl: food.imageUrl,
@@ -511,47 +547,6 @@ class _HomePageBottumState extends State<HomePageBottum>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildErrorWidget(String message) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, color: Colors.red, size: 40),
-          const SizedBox(height: 10),
-          Text(
-            message,
-            style: const TextStyle(
-              color: Colors.red,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {});
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text("Retry"),
-          ),
-        ],
-      ),
     );
   }
 }

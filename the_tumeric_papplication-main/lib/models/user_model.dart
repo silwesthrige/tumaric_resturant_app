@@ -1,19 +1,41 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// Cart item model to store food ID and quantity
+class CartItem {
+  final String foodId;
+  final int quantity;
+
+  CartItem({required this.foodId, required this.quantity});
+
+  Map<String, dynamic> toJson() {
+    return {'foodId': foodId, 'quantity': quantity};
+  }
+
+  factory CartItem.fromJson(Map<String, dynamic> json) {
+    return CartItem(
+      foodId: json['foodId'] ?? '',
+      quantity: json['quantity'] ?? 1,
+    );
+  }
+}
+
 class UserModel {
   final String uID;
   final String? name;
   final String? email;
-  final String? password; // Consider security implications of storing plain passwords
+  final String?
+  password; // Consider security implications of storing plain passwords
   final String? address;
   final String? phone;
-  final List<String>? cart;
+  final List<CartItem>? cart; // Updated to use CartItem instead of String
   final List<String>? favFoods;
   final List<String>? orders;
+  final List<String>? offers;
   final String? profileImageUrl; // Added for a potential profile image
 
   UserModel({
+    this.offers,
     required this.uID,
     this.email,
     this.password,
@@ -35,10 +57,11 @@ class UserModel {
       // "password": password, // Do not save passwords directly in Firestore. Use Firebase Auth.
       "address": address,
       "phone": phone,
-      "cart": cart ?? [],
+      "cart": cart?.map((item) => item.toJson()).toList() ?? [],
       "favFoods": favFoods ?? [],
       "orders": orders ?? [],
-      "profileImageUrl": profileImageUrl, // Added
+      "profileImageUrl": profileImageUrl,
+      "offers": offers ?? [], // Added
     };
   }
 
@@ -51,11 +74,20 @@ class UserModel {
       // password: json['password'], // Do not retrieve passwords directly
       address: json['address'],
       phone: json['phone'],
-      cart: json['cart'] != null ? List<String>.from(json['cart']) : null,
+      cart:
+          json['cart'] != null
+              ? (json['cart'] as List)
+                  .map((item) => CartItem.fromJson(item))
+                  .toList()
+              : null,
       favFoods:
           json['favFoods'] != null ? List<String>.from(json['favFoods']) : null,
       orders: json['orders'] != null ? List<String>.from(json['orders']) : null,
-      profileImageUrl: json['profileImageUrl'], // Added
+      profileImageUrl: json['profileImageUrl'],
+      offers:
+          json['offers'] != null
+              ? List<String>.from(json['offers'])
+              : null, // Added
     );
   }
 
@@ -67,7 +99,7 @@ class UserModel {
     String? password,
     String? address,
     String? phone,
-    List<String>? cart,
+    List<CartItem>? cart,
     List<String>? favFoods,
     List<String>? orders,
     String? profileImageUrl,

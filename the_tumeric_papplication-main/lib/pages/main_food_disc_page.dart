@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:the_tumeric_papplication/pages/home_page.dart';
+import 'package:the_tumeric_papplication/services/cart_service.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 
 class MainFoodDiscPage extends StatefulWidget {
+  final String foodId;
   final String title;
   final String disc;
   final String imageUrl;
@@ -15,6 +18,7 @@ class MainFoodDiscPage extends StatefulWidget {
     required this.imageUrl,
     required this.price,
     required this.time,
+    required this.foodId,
   });
 
   @override
@@ -480,6 +484,12 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
             color: Colors.transparent,
             child: InkWell(
               onTap: () {
+                CartService().addToCart(
+                  context,
+                  widget.foodId,
+                  quantity: quantity,
+                );
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Row(

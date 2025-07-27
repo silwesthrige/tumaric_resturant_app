@@ -7,6 +7,7 @@ class CaertAddCard extends StatefulWidget {
   final String disc;
   final double price;
   final VoidCallback? onDelete;
+  final int qty;
 
   const CaertAddCard({
     super.key,
@@ -15,6 +16,7 @@ class CaertAddCard extends StatefulWidget {
     required this.disc,
     required this.price,
     this.onDelete,
+    required this.qty,
   });
 
   @override
@@ -159,28 +161,48 @@ class _CaertAddCardState extends State<CaertAddCard>
                         const SizedBox(height: 10),
 
                         // Price as a Chip
-                        Container(
-                          decoration: BoxDecoration(
-                            color: kmainGreen.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: kmainGreen.withOpacity(0.2),
-                              width: 0.5,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                color: kmainGreen.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: kmainGreen.withOpacity(0.2),
+                                  width: 0.5,
+                                ),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 6,
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                "\$${widget.price.toStringAsFixed(2)}", // Use widget.price
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: kmainGreen,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                             ),
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 12,
-                          ),
-                          child: Text(
-                            "\$${widget.price.toStringAsFixed(2)}", // Use widget.price
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: kmainGreen,
-                              letterSpacing: 0.5,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 6,
+                                horizontal: 12,
+                              ),
+                              child: Text(
+                                "x ${widget.qty}",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                  color: kMainOrange,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),

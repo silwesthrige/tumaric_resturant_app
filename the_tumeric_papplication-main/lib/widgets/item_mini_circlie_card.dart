@@ -27,6 +27,13 @@ class ItemMiniCirclieCard extends StatelessWidget {
                   image: NetworkImage(imageUrl),
                   fit: BoxFit.cover,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.9),
+                    blurRadius: 8,
+                    offset: Offset(1, 5),
+                  ),
+                ],
               ),
             ),
             SizedBox(height: 5),

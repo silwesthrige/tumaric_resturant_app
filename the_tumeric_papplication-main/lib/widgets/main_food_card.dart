@@ -27,15 +27,20 @@ class MainFoodCard extends StatefulWidget {
 }
 
 class _MainFoodCardState extends State<MainFoodCard>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
   bool isFavorite = false;
   bool isInCart = false;
+  bool isLoading = false;
+  final CartService _cartService = CartService();
 
   @override
   void initState() {
     super.initState();
+    // Add observer to listen for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
@@ -43,12 +48,51 @@ class _MainFoodCardState extends State<MainFoodCard>
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    // Check cart status when widget initializes
+    _checkCartStatus();
   }
 
   @override
   void dispose() {
+    // Remove observer when disposing
+    WidgetsBinding.instance.removeObserver(this);
     _animationController.dispose();
     super.dispose();
+  }
+
+  // This method is called when the app lifecycle changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // Refresh cart status when app comes back to foreground
+      _checkCartStatus();
+    }
+  }
+
+  // Also override didChangeDependencies to refresh when returning from navigation
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkCartStatus();
+  }
+
+  // Check if item is in cart from Firestore
+  Future<void> _checkCartStatus() async {
+    try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null && widget.food.foodId != null) {
+        final inCart = await _cartService.isInCart(uid, widget.food.foodId!);
+        if (mounted) {
+          setState(() {
+            isInCart = inCart;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error checking cart status: $e');
+    }
   }
 
   void _onTapDown(TapDownDetails details) {
@@ -65,6 +109,7 @@ class _MainFoodCardState extends State<MainFoodCard>
 
   @override
   Widget build(BuildContext context) {
+    final String uid = FirebaseAuth.instance.currentUser!.uid;
     return GestureDetector(
       onTap: widget.ontap,
       onTapDown: _onTapDown,
@@ -278,38 +323,43 @@ class _MainFoodCardState extends State<MainFoodCard>
 
                     // Add to Cart Button
                     GestureDetector(
-                      onTap: () {
-                        final uid = FirebaseAuth.instance.currentUser!.uid;
-                        // ScaffoldMessenger.of(context).showSnackBar(
-                        //   SnackBar(content: Text("${widget.food.foodId}")),
-                        // );
-                        if (isInCart) {
-                          // FoodServices().removeFromCart(
-                          //   context,
-                          //   widget.food.foodId!,
-                          //   uid,
-                          // );
+                      onTap:
+                          isLoading
+                              ? null
+                              : () async {
+                                if (widget.food.foodId == null) return;
 
-                          CartService().removeFromCart(
-                            context,
-                            widget.food.foodId!.trim(),
-                          );
-                        } else {
-                          // FoodServices().addToCart(
-                          //   context,
-                          //   widget.food.foodId!,
-                          //   uid,
-                          // );
-                          CartService().addToCart(
-                            context,
-                            widget.food.foodId!.trim(),
-                          );
-                        }
+                                setState(() {
+                                  isLoading = true;
+                                });
 
-                        setState(() {
-                          isInCart = !isInCart;
-                        });
-                      },
+                                try {
+                                  if (isInCart) {
+                                    await _cartService.removeFromCart(
+                                      context,
+                                      widget.food.foodId!.trim(),
+                                    );
+                                  } else {
+                                    await _cartService.addToCart(
+                                      context,
+                                      widget.food.foodId!.trim(),
+                                    );
+                                  }
+
+                                  // Update the local state
+                                  setState(() {
+                                    isInCart = !isInCart;
+                                  });
+                                } catch (e) {
+                                  print('Error updating cart: $e');
+                                  // Recheck cart status on error
+                                  _checkCartStatus();
+                                } finally {
+                                  setState(() {
+                                    isLoading = false;
+                                  });
+                                }
+                              },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         padding: const EdgeInsets.all(8),
@@ -332,16 +382,30 @@ class _MainFoodCardState extends State<MainFoodCard>
                                   ]
                                   : [],
                         ),
-                        child: Icon(
-                          isInCart
-                              ? Icons.shopping_cart
-                              : Icons.add_shopping_cart,
-                          color:
-                              isInCart
-                                  ? Colors.white
-                                  : const Color.fromARGB(15, 0, 0, 0),
-                          size: 20,
-                        ),
+                        child:
+                            isLoading
+                                ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      isInCart
+                                          ? Colors.white
+                                          : const Color(0xFF2E3192),
+                                    ),
+                                  ),
+                                )
+                                : Icon(
+                                  isInCart
+                                      ? Icons.shopping_cart
+                                      : Icons.add_shopping_cart,
+                                  color:
+                                      isInCart
+                                          ? Colors.white
+                                          : const Color(0xFF2E3192),
+                                  size: 20,
+                                ),
                       ),
                     ),
                   ],

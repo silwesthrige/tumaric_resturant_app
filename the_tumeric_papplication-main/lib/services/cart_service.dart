@@ -2,12 +2,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-
 class CartService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<List<DocumentSnapshot>> getCartFoodDetails(List<String> foodIds) async {
+  Future<List<DocumentSnapshot>> getCartFoodDetails(
+    List<String> foodIds,
+  ) async {
     if (foodIds.isEmpty) return [];
 
     List<DocumentSnapshot> allDocs = [];
@@ -20,10 +21,11 @@ class CartService {
           i + 10 > foodIds.length ? foodIds.length : i + 10,
         );
 
-        final querySnapshot = await _firestore
-            .collection('menus')
-            .where(FieldPath.documentId, whereIn: chunk)
-            .get();
+        final querySnapshot =
+            await _firestore
+                .collection('menus')
+                .where(FieldPath.documentId, whereIn: chunk)
+                .get();
 
         allDocs.addAll(querySnapshot.docs);
       }
@@ -40,7 +42,7 @@ class CartService {
   Future<List<String>> getCartFoodIds(String uid) async {
     try {
       final userDoc = await _firestore.collection('users').doc(uid).get();
-      
+
       if (userDoc.exists) {
         final data = userDoc.data();
         if (data != null && data.containsKey('cart')) {
@@ -62,16 +64,79 @@ class CartService {
     }
   }
 
+  // Add this method to your CartService class
+  Future<List<DocumentSnapshot>> loadCartItemsByIds(
+    List<String> foodIds,
+  ) async {
+    try {
+      if (foodIds.isEmpty) return [];
+
+      // Firestore 'whereIn' has a limit of 10 items, so we need to batch if more
+      List<DocumentSnapshot> allDocs = [];
+
+      // Split into batches of 10
+      for (int i = 0; i < foodIds.length; i += 10) {
+        int end = (i + 10 < foodIds.length) ? i + 10 : foodIds.length;
+        List<String> batch = foodIds.sublist(i, end);
+
+        QuerySnapshot querySnapshot =
+            await FirebaseFirestore.instance
+                .collection(
+                  'foods',
+                ) // Make sure this matches your actual collection name
+                .where(FieldPath.documentId, whereIn: batch)
+                .get();
+
+        allDocs.addAll(querySnapshot.docs);
+      }
+
+      return allDocs;
+    } catch (e) {
+      print("Error loading cart items by IDs: $e");
+      throw e;
+    }
+  }
+
+  // Alternative method if you prefer individual document fetches
+  Future<List<DocumentSnapshot>> loadCartItemsByIdsAlternative(
+    List<String> foodIds,
+  ) async {
+    try {
+      if (foodIds.isEmpty) return [];
+
+      List<DocumentSnapshot> docs = [];
+
+      for (String foodId in foodIds) {
+        DocumentSnapshot doc =
+            await FirebaseFirestore.instance
+                .collection(
+                  'foods',
+                ) // Make sure this matches your actual collection name
+                .doc(foodId)
+                .get();
+
+        if (doc.exists) {
+          docs.add(doc);
+        }
+      }
+
+      return docs;
+    } catch (e) {
+      print("Error loading cart items by IDs (alternative): $e");
+      throw e;
+    }
+  }
+
   /// Load complete cart items with food details
   Future<List<DocumentSnapshot>> loadCartItems(String uid) async {
     try {
       List<String> cartIds = await getCartFoodIds(uid);
-      
+
       if (cartIds.isEmpty) {
         print("Cart is empty for user: $uid");
         return [];
       }
-      
+
       return await getCartFoodDetails(cartIds);
     } catch (e) {
       print("Error loading cart items: $e");
@@ -89,12 +154,37 @@ class CartService {
 
       final userRef = _firestore.collection('users').doc(uid);
 
-      await userRef.update({
-        "cart": FieldValue.arrayRemove([foodId]),
-      });
+      // Get current cart data
+      final userDoc = await userRef.get();
+      if (!userDoc.exists) {
+        throw Exception("User document not found");
+      }
+
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final List<dynamic> currentCart = userData['cart'] ?? [];
+
+      // Remove the item with matching foodId
+      List<Map<String, dynamic>> updatedCart = [];
+
+      for (var item in currentCart) {
+        if (item is Map<String, dynamic>) {
+          // New format: check foodId in the object
+          if (item['foodId'] != foodId) {
+            updatedCart.add(item);
+          }
+        } else if (item is String) {
+          // Old format: check if string matches foodId
+          if (item != foodId) {
+            updatedCart.add({'foodId': item, 'quantity': 1});
+          }
+        }
+      }
+
+      // Update Firestore with the new cart
+      await userRef.update({"cart": updatedCart});
 
       print("Successfully removed $foodId from cart");
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -122,7 +212,11 @@ class CartService {
   }
 
   /// Add item to cart
-  Future<void> addToCart(BuildContext context, String foodId) async {
+  Future<void> addToCart(
+    BuildContext context,
+    String foodId, {
+    int quantity = 1,
+  }) async {
     try {
       final uid = _auth.currentUser?.uid;
       if (uid == null) {
@@ -131,42 +225,57 @@ class CartService {
 
       final userRef = _firestore.collection('users').doc(uid);
 
-      // Check if item already exists in cart
+      // Get current cart
       final userDoc = await userRef.get();
+      List<Map<String, dynamic>> currentCart = [];
+
       if (userDoc.exists) {
         final data = userDoc.data();
-        final currentCart = List<String>.from(data?['cart'] ?? []);
-        
-        if (currentCart.contains(foodId)) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("Item already in cart"),
-                backgroundColor: Colors.orange[400],
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-          return;
+        currentCart = List<Map<String, dynamic>>.from(data?['cart'] ?? []);
+      }
+
+      // Check if item already exists in cart
+      final existingItemIndex = currentCart.indexWhere(
+        (item) => item['foodId'] == foodId,
+      );
+
+      if (existingItemIndex != -1) {
+        // Update quantity if item exists
+        currentCart[existingItemIndex]['quantity'] =
+            (currentCart[existingItemIndex]['quantity'] ?? 1) + quantity;
+
+        print("Successfully updated quantity for $foodId in cart");
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Updated quantity in cart"),
+              backgroundColor: Colors.green[400],
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        // Add new item to cart
+        currentCart.add({'foodId': foodId, 'quantity': quantity});
+
+        print("Successfully added $foodId to cart");
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Item added to cart"),
+              backgroundColor: Colors.green[400],
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 2),
+            ),
+          );
         }
       }
 
-      await userRef.update({
-        "cart": FieldValue.arrayUnion([foodId]),
-      });
-
-      print("Successfully added $foodId to cart");
-      
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Item added to cart"),
-            backgroundColor: Colors.green[400],
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      // Update Firestore
+      await userRef.update({"cart": currentCart});
     } catch (e) {
       print("Add to cart error: $e");
       if (context.mounted) {
@@ -187,12 +296,10 @@ class CartService {
     try {
       final userRef = _firestore.collection('users').doc(uid);
 
-      await userRef.update({
-        "cart": [],
-      });
+      await userRef.update({"cart": []});
 
       print("Successfully cleared cart for user: $uid");
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
