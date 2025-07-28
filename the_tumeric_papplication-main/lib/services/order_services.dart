@@ -9,6 +9,7 @@ class OrderService {
 
   // Create a new order
   Future<String?> createOrder({
+    required double total,
     required List<Map<String, dynamic>> items,
     required String deliveryAddress,
     String status = 'pending',
@@ -51,6 +52,7 @@ class OrderService {
         'deliveryAddress': deliveryAddress.trim(),
         'createdAt': DateTime.now().toIso8601String(),
         'updatedAt': DateTime.now().toIso8601String(),
+        'total' : total.toDouble(),
       };
 
       DocumentReference docRef = await _firestore

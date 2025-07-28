@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:the_tumeric_papplication/pages/home_page.dart';
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/offer_page.dart';
+import 'package:the_tumeric_papplication/pages/profile_pages/feedback_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 
 class RouterClass {
@@ -33,6 +34,12 @@ class RouterClass {
         path: "/profile",
         name: "profile Details",
         builder: (context, state) => ProfileDetailsPage(),
+      ),
+
+      GoRoute(
+        path: "/craeted-feedback",
+        name: "Add feedback",
+        builder: (context, state) => CreateFeedbackPage(),
       ),
     ],
   );

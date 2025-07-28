@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart'; // Adjust path
+import 'package:the_tumeric_papplication/pages/profile_pages/feedback_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
+import 'package:the_tumeric_papplication/pages/profile_pages/resturant_page.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
 import 'package:firebase_auth/firebase_auth.dart'
     as fb_auth; // Alias to avoid conflict
@@ -183,30 +185,32 @@ class _ProfilePageState extends State<ProfilePage> {
                                 ),
                           ),
 
-                          // _buildMenuCard(
-                          //   context,
-                          //   icon: Icons.star_outline,
-                          //   title: 'Feedbacks',
-                          //   subtitle: 'Share your experience with us',
-                          //   onTap: () => Navigator.push(
-                          //     context,
-                          //     MaterialPageRoute(
-                          //       builder: (context) => const FeedbacksPage(),
-                          //     ),
-                          //   ),
-                          // ),
+                          _buildMenuCard(
+                            context,
+                            icon: Icons.star_outline,
+                            title: 'Feedbacks',
+                            subtitle: 'Share your experience with us',
+                            onTap:
+                                () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const FeedbacksPage(),
+                                  ),
+                                ),
+                          ),
 
                           // _buildMenuCard(
                           //   context,
                           //   icon: Icons.contact_support_outlined,
                           //   title: 'Contact Us',
                           //   subtitle: 'Get in touch with support',
-                          //   onTap: () => Navigator.push(
-                          //     context,
-                          //     MaterialPageRoute(
-                          //       builder: (context) => const ContactUsPage(),
-                          //     ),
-                          //   ),
+                          //   onTap:
+                          //       () => Navigator.push(
+                          //         context,
+                          //         MaterialPageRoute(
+                          //           builder: (context) => const FeedbacksPage(),
+                          //         ),
+                          //       ),
                           // ),
 
                           // _buildMenuCard(

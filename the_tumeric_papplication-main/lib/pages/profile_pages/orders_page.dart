@@ -1,6 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/order_model.dart';
-
 import 'package:the_tumeric_papplication/services/order_services.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -14,17 +14,85 @@ class _OrdersPageState extends State<OrdersPage>
     with SingleTickerProviderStateMixin {
   final OrderService _orderService = OrderService();
   late TabController _tabController;
+  Timer? _refreshTimer;
+  Timer? _countdownTimer;
+  List<OrderModel>? _cachedActiveOrders;
+  List<OrderModel>? _cachedHistoryOrders;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadInitialData();
+    _startRealTimeUpdates();
+    _startCountdownTimer();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _refreshTimer?.cancel();
+    _countdownTimer?.cancel();
     super.dispose();
+  }
+
+  void _loadInitialData() async {
+    try {
+      final activeOrders = await _orderService.getActiveOrders();
+      final historyOrders = await _orderService.getCompletedOrders();
+
+      if (mounted) {
+        setState(() {
+          _cachedActiveOrders = activeOrders;
+          _cachedHistoryOrders = historyOrders;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  void _startRealTimeUpdates() {
+    // Refresh orders every 30 seconds to get real-time status updates
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) {
+        _refreshOrdersData();
+      }
+    });
+  }
+
+  void _startCountdownTimer() {
+    // Update countdown every second for better user experience
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        // Only trigger rebuild for countdown, not data refresh
+        setState(() {
+          // This will only update the countdown timers, not reload data
+        });
+      }
+    });
+  }
+
+  void _refreshOrdersData() async {
+    try {
+      final activeOrders = await _orderService.getActiveOrders();
+      final historyOrders = await _orderService.getCompletedOrders();
+
+      if (mounted) {
+        setState(() {
+          _cachedActiveOrders = activeOrders;
+          _cachedHistoryOrders = historyOrders;
+        });
+      }
+    } catch (e) {
+      // Silently handle errors for background refresh
+    }
   }
 
   @override
@@ -38,6 +106,16 @@ class _OrdersPageState extends State<OrdersPage>
         ),
         backgroundColor: Colors.orange,
         elevation: 0,
+        actions: [
+          // Add refresh button for manual refresh
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              _refreshOrdersData();
+              _showSnackBar('Refreshing orders...', Colors.orange);
+            },
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -57,74 +135,60 @@ class _OrdersPageState extends State<OrdersPage>
   }
 
   Widget _buildActiveOrders() {
-    return FutureBuilder<List<OrderModel>>(
-      future: _orderService.getActiveOrders(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingWidget();
-        }
+    if (_isLoading) {
+      return _buildLoadingWidget();
+    }
 
-        if (snapshot.hasError) {
-          return _buildErrorWidget(snapshot.error.toString());
-        }
+    final activeOrders = _cachedActiveOrders ?? [];
 
-        final activeOrders = snapshot.data ?? [];
+    if (activeOrders.isEmpty) {
+      return _buildEmptyState(
+        'No Active Orders',
+        'You don\'t have any active orders at the moment.',
+        Icons.shopping_bag_outlined,
+      );
+    }
 
-        if (activeOrders.isEmpty) {
-          return _buildEmptyState(
-            'No Active Orders',
-            'You don\'t have any active orders at the moment.',
-            Icons.shopping_bag_outlined,
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async => setState(() {}),
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: activeOrders.length,
-            itemBuilder: (context, index) {
-              return _buildOrderCard(activeOrders[index], isActive: true);
-            },
-          ),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        _loadInitialData();
       },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: activeOrders.length,
+        itemBuilder: (context, index) {
+          return _buildOrderCard(activeOrders[index], isActive: true);
+        },
+      ),
     );
   }
 
   Widget _buildOrderHistory() {
-    return FutureBuilder<List<OrderModel>>(
-      future: _orderService.getCompletedOrders(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingWidget();
-        }
+    if (_isLoading) {
+      return _buildLoadingWidget();
+    }
 
-        if (snapshot.hasError) {
-          return _buildErrorWidget(snapshot.error.toString());
-        }
+    final historyOrders = _cachedHistoryOrders ?? [];
 
-        final historyOrders = snapshot.data ?? [];
+    if (historyOrders.isEmpty) {
+      return _buildEmptyState(
+        'No Order History',
+        'Your completed and cancelled orders will appear here.',
+        Icons.history,
+      );
+    }
 
-        if (historyOrders.isEmpty) {
-          return _buildEmptyState(
-            'No Order History',
-            'Your completed and cancelled orders will appear here.',
-            Icons.history,
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async => setState(() {}),
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: historyOrders.length,
-            itemBuilder: (context, index) {
-              return _buildOrderCard(historyOrders[index], isActive: false);
-            },
-          ),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        _loadInitialData();
       },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: historyOrders.length,
+        itemBuilder: (context, index) {
+          return _buildOrderCard(historyOrders[index], isActive: false);
+        },
+      ),
     );
   }
 
@@ -562,14 +626,14 @@ class _OrdersPageState extends State<OrdersPage>
     final now = DateTime.now();
     final difference = now.difference(createdAt);
 
-    return difference.inMinutes <= 10;
+    return difference.inMinutes <= 3;
   }
 
   Duration _getTimeRemainingForCancel(OrderModel order) {
     final createdAt = DateTime.parse(order.createdAt.toString());
     final now = DateTime.now();
     final elapsed = now.difference(createdAt);
-    final remaining = const Duration(minutes: 10) - elapsed;
+    final remaining = const Duration(minutes: 3) - elapsed;
 
     return remaining.isNegative ? Duration.zero : remaining;
   }
@@ -707,6 +771,8 @@ class _OrdersPageState extends State<OrdersPage>
     try {
       await _orderService.updateDeliveryAddress(orderId, newAddress);
       _showSnackBar('Address updated successfully', Colors.green);
+      // Refresh immediately after update
+      _refreshOrdersData();
     } catch (e) {
       _showSnackBar('Failed to update address: $e', Colors.red);
     }
@@ -718,6 +784,8 @@ class _OrdersPageState extends State<OrdersPage>
     try {
       await _orderService.cancelOrder(orderId);
       _showSnackBar('Order cancelled successfully', Colors.green);
+      // Refresh immediately after cancellation
+      _refreshOrdersData();
     } catch (e) {
       _showSnackBar('Failed to cancel order: $e', Colors.red);
     }

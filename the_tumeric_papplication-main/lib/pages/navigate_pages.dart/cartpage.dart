@@ -31,6 +31,7 @@ class _CartPageState extends State<CartPage> {
   bool isTouch = true;
   bool _isProcessingOrder = false;
   String _userAddress = "";
+  bool refresh = false;
 
   // Offer-related variables
   ClaimedOffer? _selectedOffer;
@@ -539,13 +540,13 @@ class _CartPageState extends State<CartPage> {
         'tax': tax,
         'deliveryFee': deliveryFee,
         'discountAmount': _discountAmount,
-        'finalTotal': finalTotal,
+        'finalTotal': finalTotal.toStringAsFixed(2),
         'appliedOffer': _selectedOffer?.toJson(),
       };
 
       // Create order using OrderService
       String? orderId = await _orderService.createOrder(
-        
+        total: finalTotal,
         items: orderItems,
         deliveryAddress: _addressController.text.trim(),
         status: 'pending',
@@ -878,11 +879,17 @@ class _CartPageState extends State<CartPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context, false),
+                  onPressed: () {
+                    Navigator.pop(context, false);
+                    setState(() {});
+                  },
                   child: Text("Cancel"),
                 ),
                 TextButton(
-                  onPressed: () => Navigator.pop(context, true),
+                  onPressed: () {
+                    Navigator.pop(context, true);
+                    setState(() {});
+                  },
                   style: TextButton.styleFrom(foregroundColor: Colors.red),
                   child: Text("Remove"),
                 ),
@@ -1112,6 +1119,9 @@ class _CartPageState extends State<CartPage> {
                                   context,
                                   item.foodId!,
                                 );
+                                setState(() {
+                                  refresh = !refresh;
+                                });
                               },
                             ),
                           );
