@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart'; // Adjust path
+import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
 import 'package:firebase_auth/firebase_auth.dart'
@@ -168,18 +169,19 @@ class _ProfilePageState extends State<ProfilePage> {
                             },
                           ),
 
-                          // _buildMenuCard(
-                          //   context,
-                          //   icon: Icons.history,
-                          //   title: 'Order History',
-                          //   subtitle: 'View your past orders',
-                          //   onTap: () => Navigator.push(
-                          //     context,
-                          //     MaterialPageRoute(
-                          //       builder: (context) => const OrderHistoryPage(),
-                          //     ),
-                          //   ),
-                          // ),
+                          _buildMenuCard(
+                            context,
+                            icon: Icons.history,
+                            title: 'Order History',
+                            subtitle: 'View your past orders',
+                            onTap:
+                                () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => OrdersPage(),
+                                  ),
+                                ),
+                          ),
 
                           // _buildMenuCard(
                           //   context,

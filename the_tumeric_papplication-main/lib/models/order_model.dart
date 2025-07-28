@@ -4,8 +4,10 @@ class OrderModel {
   final List<Map<String, dynamic>> items; // each item: name, price, qty
   final String status;
   final DateTime createdAt;
+  final String deliveryAddress;
 
   OrderModel({
+    required this.deliveryAddress,
     required this.orderId,
     required this.userId,
     required this.items,
@@ -21,6 +23,7 @@ class OrderModel {
       "items": items,
       "status": status,
       "createdAt": createdAt,
+      "deliveryAddress": deliveryAddress,
     };
   }
 
@@ -32,6 +35,7 @@ class OrderModel {
       items: List<Map<String, dynamic>>.from(Json['items']),
       status: Json["status"],
       createdAt: DateTime.parse(Json["createdAt"]),
+      deliveryAddress: Json["deliveryAddress"],
     );
   }
 }

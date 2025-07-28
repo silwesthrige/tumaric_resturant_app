@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:the_tumeric_papplication/pages/home_page.dart';
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/offer_page.dart';
+import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 
 class RouterClass {
   final router = GoRouter(
@@ -28,7 +29,11 @@ class RouterClass {
         builder: (context, state) => OfferPage(),
       ),
 
-      
+      GoRoute(
+        path: "/profile",
+        name: "profile Details",
+        builder: (context, state) => ProfileDetailsPage(),
+      ),
     ],
   );
 }

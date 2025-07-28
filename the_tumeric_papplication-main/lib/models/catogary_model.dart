@@ -13,11 +13,11 @@ class CatogaryModel {
 
   factory CatogaryModel.fromJsonCatogary(Map<String, dynamic> docs, String id) {
     return CatogaryModel(
-      catogaryName: docs['catogaryName'] ?? '',
+      catogaryName: docs['categoryName'] ?? '',
       foodIds: docs['FoodId'] != null ? List<String>.from(docs['FoodId']) : [],
       imageUrl: docs['imageUrl'] ?? '',
       catogaryId:
-          docs['catogaryId'] ??
+          docs['categoryId'] ??
           id, // Use from docs or fallback to the passed id
     );
   }

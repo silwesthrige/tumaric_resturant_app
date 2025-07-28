@@ -11,27 +11,22 @@ class OrderService {
   Future<String?> createOrder({
     required List<Map<String, dynamic>> items,
     required String deliveryAddress,
-
-    String status = 'pending', // Default status
+    String status = 'pending',
   }) async {
     try {
-      // Get current user
       User? currentUser = _auth.currentUser;
       if (currentUser == null) {
         throw Exception('User not authenticated');
       }
 
-      // Validate items
       if (items.isEmpty) {
         throw Exception('Order must contain at least one item');
       }
 
-      // Validate delivery address
       if (deliveryAddress.trim().isEmpty) {
         throw Exception('Delivery address is required');
       }
 
-      // Validate each item structure
       for (var item in items) {
         if (!item.containsKey('name') ||
             !item.containsKey('price') ||
@@ -48,7 +43,6 @@ class OrderService {
         }
       }
 
-      // Create order data
       Map<String, dynamic> orderData = {
         'orderId': "",
         'userId': currentUser.uid,
@@ -59,12 +53,11 @@ class OrderService {
         'updatedAt': DateTime.now().toIso8601String(),
       };
 
-      // Add order to Firestore
       DocumentReference docRef = await _firestore
           .collection(_ordersCollection)
           .add(orderData);
       await docRef.update({'orderId': docRef.id});
-      return docRef.id; // Return the generated order ID
+      return docRef.id;
     } catch (e) {
       print('Error creating order: $e');
       rethrow;
@@ -87,7 +80,7 @@ class OrderService {
     }
   }
 
-  // Get all orders for current user
+  // FIXED: Get all orders for current user - NO COMPOSITE INDEX NEEDED
   Future<List<OrderModel>> getUserOrders() async {
     try {
       User? currentUser = _auth.currentUser;
@@ -95,26 +88,38 @@ class OrderService {
         throw Exception('User not authenticated');
       }
 
+      // Simple query with only WHERE clause - no orderBy to avoid composite index
       QuerySnapshot querySnapshot =
           await _firestore
               .collection(_ordersCollection)
               .where('userId', isEqualTo: currentUser.uid)
-              .orderBy('createdAt', descending: true)
               .get();
 
-      return querySnapshot.docs
-          .map(
-            (doc) =>
-                OrderModel.fromJson(doc.data() as Map<String, dynamic>, doc.id),
-          )
-          .toList();
+      List<OrderModel> orders =
+          querySnapshot.docs
+              .map(
+                (doc) => OrderModel.fromJson(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList();
+
+      // Sort in code instead of in query
+      orders.sort((a, b) {
+        DateTime dateA = DateTime.parse(a.createdAt.toString());
+        DateTime dateB = DateTime.parse(b.createdAt.toString());
+        return dateB.compareTo(dateA); // Descending order (newest first)
+      });
+
+      return orders;
     } catch (e) {
       print('Error getting user orders: $e');
       rethrow;
     }
   }
 
-  // Get orders by status for current user
+  // FIXED: Get orders by status - NO COMPOSITE INDEX NEEDED
   Future<List<OrderModel>> getUserOrdersByStatus(String status) async {
     try {
       User? currentUser = _auth.currentUser;
@@ -122,22 +127,46 @@ class OrderService {
         throw Exception('User not authenticated');
       }
 
-      QuerySnapshot querySnapshot =
-          await _firestore
-              .collection(_ordersCollection)
-              .where('userId', isEqualTo: currentUser.uid)
-              .where('status', isEqualTo: status)
-              .orderBy('createdAt', descending: true)
-              .get();
+      // Get all user orders first
+      List<OrderModel> allOrders = await getUserOrders();
 
-      return querySnapshot.docs
-          .map(
-            (doc) =>
-                OrderModel.fromJson(doc.data() as Map<String, dynamic>, doc.id),
-          )
-          .toList();
+      // Filter by status in code
+      return allOrders.where((order) => order.status == status).toList();
     } catch (e) {
       print('Error getting orders by status: $e');
+      rethrow;
+    }
+  }
+
+  // FIXED: Get active orders
+  Future<List<OrderModel>> getActiveOrders() async {
+    try {
+      List<OrderModel> allOrders = await getUserOrders();
+      const activeStatuses = [
+        'pending',
+        'confirmed',
+        'preparing',
+        'out_for_delivery',
+      ];
+      return allOrders
+          .where((order) => activeStatuses.contains(order.status))
+          .toList();
+    } catch (e) {
+      print('Error getting active orders: $e');
+      rethrow;
+    }
+  }
+
+  // FIXED: Get completed orders
+  Future<List<OrderModel>> getCompletedOrders() async {
+    try {
+      List<OrderModel> allOrders = await getUserOrders();
+      const completedStatuses = ['delivered', 'cancelled'];
+      return allOrders
+          .where((order) => completedStatuses.contains(order.status))
+          .toList();
+    } catch (e) {
+      print('Error getting completed orders: $e');
       rethrow;
     }
   }
@@ -150,7 +179,6 @@ class OrderService {
         throw Exception('User not authenticated');
       }
 
-      // First check if order exists and belongs to user
       DocumentSnapshot doc =
           await _firestore.collection(_ordersCollection).doc(orderId).get();
 
@@ -160,19 +188,16 @@ class OrderService {
 
       Map<String, dynamic> orderData = doc.data() as Map<String, dynamic>;
 
-      // Check if order belongs to current user
       if (orderData['userId'] != currentUser.uid) {
         throw Exception('Unauthorized: Order does not belong to current user');
       }
 
-      // Check if order can be cancelled (only pending orders)
       if (orderData['status'] != 'pending') {
         throw Exception(
           'Order cannot be cancelled. Current status: ${orderData['status']}',
         );
       }
 
-      // Update order status to cancelled
       await _firestore.collection(_ordersCollection).doc(orderId).update({
         'status': 'cancelled',
         'updatedAt': DateTime.now().toIso8601String(),
@@ -218,7 +243,7 @@ class OrderService {
     }
   }
 
-  // Listen to order status changes
+  // FIXED: Listen to order status changes - simplified
   Stream<OrderModel?> listenToOrderChanges(String orderId) {
     return _firestore
         .collection(_ordersCollection)
@@ -235,7 +260,7 @@ class OrderService {
         });
   }
 
-  // Listen to all user orders
+  // FIXED: Listen to all user orders - NO COMPOSITE INDEX NEEDED
   Stream<List<OrderModel>> listenToUserOrders() {
     User? currentUser = _auth.currentUser;
     if (currentUser == null) {
@@ -245,17 +270,27 @@ class OrderService {
     return _firestore
         .collection(_ordersCollection)
         .where('userId', isEqualTo: currentUser.uid)
-        .orderBy('createdAt', descending: true)
+        // Removed orderBy to avoid composite index requirement
         .snapshots()
         .map((querySnapshot) {
-          return querySnapshot.docs
-              .map(
-                (doc) => OrderModel.fromJson(
-                  doc.data() as Map<String, dynamic>,
-                  doc.id,
-                ),
-              )
-              .toList();
+          List<OrderModel> orders =
+              querySnapshot.docs
+                  .map(
+                    (doc) => OrderModel.fromJson(
+                      doc.data() as Map<String, dynamic>,
+                      doc.id,
+                    ),
+                  )
+                  .toList();
+
+          // Sort in code instead
+          orders.sort((a, b) {
+            DateTime dateA = DateTime.parse(a.createdAt.toString());
+            DateTime dateB = DateTime.parse(b.createdAt.toString());
+            return dateB.compareTo(dateA); // Descending order
+          });
+
+          return orders;
         });
   }
 
@@ -271,7 +306,6 @@ class OrderService {
         throw Exception('Delivery address cannot be empty');
       }
 
-      // Check if order exists and belongs to user
       DocumentSnapshot doc =
           await _firestore.collection(_ordersCollection).doc(orderId).get();
 
@@ -291,7 +325,6 @@ class OrderService {
         );
       }
 
-      // Update delivery address
       await _firestore.collection(_ordersCollection).doc(orderId).update({
         'deliveryAddress': newAddress.trim(),
         'updatedAt': DateTime.now().toIso8601String(),

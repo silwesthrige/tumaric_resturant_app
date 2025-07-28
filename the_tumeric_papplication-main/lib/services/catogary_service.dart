@@ -3,7 +3,7 @@ import 'package:the_tumeric_papplication/models/catogary_model.dart';
 
 class CatogaryService {
   final CollectionReference _catogaryCollection = FirebaseFirestore.instance
-      .collection("catogary");
+      .collection("category");
 
   //Get catogary details
   Stream<List<CatogaryModel>> getCatogary() {

@@ -788,6 +788,7 @@ class _OfferPageState extends State<OfferPage> {
               ),
             ],
           ),
+
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
