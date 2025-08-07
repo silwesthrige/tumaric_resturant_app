@@ -309,7 +309,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
             Icon(Icons.star_outline, color: Colors.grey[400], size: 24),
             const SizedBox(width: 12),
             Text(
-              'No ratings yet - Be the first to rate!',
+              'No ratings yet ',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],

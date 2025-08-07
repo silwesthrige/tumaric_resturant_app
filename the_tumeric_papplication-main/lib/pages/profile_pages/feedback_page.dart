@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'dart:async';
 import 'package:the_tumeric_papplication/services/feedback_services.dart';
 
 class CreateFeedbackPage extends StatefulWidget {
@@ -20,8 +20,10 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
   List<String> _selectedCategories = [];
   bool _isLoading = false;
   bool _isEditMode = false;
+  bool _hasUnsavedChanges = false;
+  Timer? _debounceTimer;
 
-  final List<String> _availableCategories = [
+  static const List<String> _availableCategories = [
     'Food Quality',
     'Service',
     'Delivery Speed',
@@ -32,74 +34,235 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
     'Order Accuracy',
   ];
 
+  // Store original values for comparison
+  late double _originalRating;
+  late String _originalComment;
+  late List<String> _originalCategories;
+
+  // Cache rating colors for performance
+  static const Map<String, Color> _ratingColors = {
+    'poor': Colors.red,
+    'fair': Colors.orange,
+    'good': Colors.blue,
+    'excellent': Colors.green,
+  };
+
   @override
   void initState() {
     super.initState();
     _isEditMode = widget.existingFeedback != null;
+
     if (_isEditMode) {
       _loadExistingFeedback();
+    } else {
+      _initializeDefaults();
     }
+
+    _commentController.addListener(_onContentChanged);
+  }
+
+  void _initializeDefaults() {
+    _originalRating = _rating;
+    _originalComment = '';
+    _originalCategories = [];
   }
 
   void _loadExistingFeedback() {
-    final feedback = widget.existingFeedback!;
-    _commentController.text = feedback['comment'] ?? '';
-    _rating = (feedback['rating'] ?? 5.0).toDouble();
-    _selectedCategories = List<String>.from(feedback['categories'] ?? []);
+    try {
+      final feedback = widget.existingFeedback!;
+
+      _rating = _extractDouble(feedback['rating'], 5.0);
+      _commentController.text = _extractString(feedback['comment'], '');
+      _selectedCategories = _extractStringList(feedback['categories'], []);
+
+      _originalRating = _rating;
+      _originalComment = _commentController.text;
+      _originalCategories = List<String>.from(_selectedCategories);
+    } catch (e) {
+      debugPrint('Error loading existing feedback: $e');
+      _showSnackBar('Error loading feedback data', Colors.orange);
+      _initializeDefaults();
+    }
+  }
+
+  double _extractDouble(dynamic value, double defaultValue) {
+    if (value == null) return defaultValue;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? defaultValue;
+    return defaultValue;
+  }
+
+  String _extractString(dynamic value, String defaultValue) {
+    return value?.toString() ?? defaultValue;
+  }
+
+  List<String> _extractStringList(dynamic value, List<String> defaultValue) {
+    if (value == null) return defaultValue;
+    if (value is List) return value.map((e) => e.toString()).toList();
+    return defaultValue;
+  }
+
+  void _onContentChanged() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        final hasChanges = _hasContentChanged();
+        if (hasChanges != _hasUnsavedChanges) {
+          setState(() {
+            _hasUnsavedChanges = hasChanges;
+          });
+        }
+      }
+    });
+  }
+
+  bool _hasContentChanged() {
+    if (!_isEditMode) return true;
+
+    return _rating != _originalRating ||
+        _commentController.text.trim() != _originalComment.trim() ||
+        !_listsEqual(_selectedCategories, _originalCategories);
+  }
+
+  bool _listsEqual(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    final sortedA = List<String>.from(a)..sort();
+    final sortedB = List<String>.from(b)..sort();
+    for (int i = 0; i < sortedA.length; i++) {
+      if (sortedA[i] != sortedB[i]) return false;
+    }
+    return true;
   }
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
+    _commentController.removeListener(_onContentChanged);
     _commentController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: Text(
-          _isEditMode ? 'Edit Review' : 'Write a Review',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.orange,
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+    return PopScope(
+      canPop: !_hasUnsavedChanges || _isLoading,
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+
+        if (_hasUnsavedChanges && !_isLoading) {
+          final shouldPop = await _showDiscardDialog();
+          if (shouldPop && mounted) {
+            Navigator.of(context).pop();
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: _buildAppBar(),
+        body: _buildBody(),
+        bottomNavigationBar: _buildBottomBar(),
       ),
-      body: SingleChildScrollView(
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Text(
+        _isEditMode ? 'Edit Review' : 'Write a Review',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+      backgroundColor: Colors.orange,
+      elevation: 0,
+      iconTheme: const IconThemeData(color: Colors.white),
+      actions: [
+        if (_isEditMode && _hasUnsavedChanges && !_isLoading)
+          IconButton(
+            icon: const Icon(Icons.save, color: Colors.white),
+            onPressed: _submitFeedback,
+            tooltip: 'Save changes',
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    return SafeArea(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header Card
               _buildHeaderCard(),
               const SizedBox(height: 20),
-
-              // Rating Card
               _buildRatingCard(),
               const SizedBox(height: 20),
-
-              // Categories Card
               _buildCategoriesCard(),
               const SizedBox(height: 20),
-
-              // Comment Card
               _buildCommentCard(),
-              const SizedBox(height: 30),
-
-              // Submit Button
-              _buildSubmitButton(),
+              const SizedBox(height: 100),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        16 + MediaQuery.of(context).padding.bottom,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.3),
+            spreadRadius: 1,
+            blurRadius: 5,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: _buildSubmitButton(),
+    );
+  }
+
+  Future<bool> _showDiscardDialog() async {
+    final shouldPop = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Discard Changes?'),
+            content: const Text(
+              'You have unsaved changes. Are you sure you want to go back?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Stay'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text(
+                  'Discard',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+    return shouldPop ?? false;
   }
 
   Widget _buildHeaderCard() {
@@ -118,7 +281,11 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.rate_review, color: Colors.white, size: 40),
+            Icon(
+              _isEditMode ? Icons.edit : Icons.rate_review,
+              color: Colors.white,
+              size: 40,
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -153,36 +320,6 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
     );
   }
 
-  Widget _buildOrderDetailsCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.receipt_long, color: Colors.orange[600], size: 24),
-                const SizedBox(width: 8),
-                const Text(
-                  'Order Details',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildRatingCard() {
     return Card(
       elevation: 2,
@@ -204,69 +341,52 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
                     color: Colors.black87,
                   ),
                 ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getRatingColor(_rating).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _getRatingColor(_rating)),
+                  ),
+                  child: Text(
+                    _getRatingText(_rating),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _getRatingColor(_rating),
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 20),
-
-            // Rating Display
             Center(
               child: Column(
                 children: [
                   Text(
                     _rating.toStringAsFixed(1),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 48,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: _getRatingColor(_rating),
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _rating = (index + 1).toDouble();
-                          });
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(
-                            index < _rating.floor()
-                                ? Icons.star
-                                : index < _rating
-                                ? Icons.star_half
-                                : Icons.star_border,
-                            color: Colors.amber,
-                            size: 40,
-                          ),
-                        ),
-                      );
-                    }),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    _getRatingText(_rating),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[700],
-                    ),
-                  ),
+                  _buildRatingStars(),
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // Rating Slider
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Colors.orange,
-                inactiveTrackColor: Colors.orange[200],
-                thumbColor: Colors.orange[600],
-                overlayColor: Colors.orange.withOpacity(0.2),
+                activeTrackColor: _getRatingColor(_rating),
+                inactiveTrackColor: Colors.grey[300],
+                thumbColor: _getRatingColor(_rating),
+                overlayColor: _getRatingColor(_rating).withOpacity(0.2),
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 12),
               ),
               child: Slider(
@@ -278,11 +398,50 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
                   setState(() {
                     _rating = value;
                   });
+                  _onContentChanged();
                 },
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRatingStars() {
+    return Semantics(
+      label: 'Rating: ${_rating.toStringAsFixed(1)} out of 5 stars',
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(5, (index) {
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _rating = (index + 1).toDouble();
+              });
+              _onContentChanged();
+            },
+            child: Semantics(
+              button: true,
+              label: '${index + 1} star${index + 1 == 1 ? '' : 's'}',
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    index < _rating.floor()
+                        ? Icons.star
+                        : index < _rating
+                        ? Icons.star_half
+                        : Icons.star_border,
+                    color: Colors.amber,
+                    size: 40,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -312,11 +471,10 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Select categories that apply to your experience',
+              'Select categories that apply to your experience (optional)',
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
-
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -329,6 +487,8 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
                         style: TextStyle(
                           color: isSelected ? Colors.white : Colors.grey[700],
                           fontSize: 12,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.normal,
                         ),
                       ),
                       selected: isSelected,
@@ -340,13 +500,27 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
                             _selectedCategories.remove(category);
                           }
                         });
+                        _onContentChanged();
                       },
                       backgroundColor: Colors.grey[200],
                       selectedColor: Colors.orange[600],
                       checkmarkColor: Colors.white,
+                      elevation: isSelected ? 2 : 0,
+                      pressElevation: 4,
                     );
                   }).toList(),
             ),
+            if (_selectedCategories.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${_selectedCategories.length} ${_selectedCategories.length == 1 ? 'category' : 'categories'} selected',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.orange[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -382,24 +556,30 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
               style: TextStyle(fontSize: 12, color: Colors.grey[600]),
             ),
             const SizedBox(height: 16),
-
             TextFormField(
               controller: _commentController,
               maxLines: 5,
               maxLength: 500,
+              textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText:
-                    'Tell us about your experience...\n\nExample: The food was delicious and arrived hot. Great packaging and fast delivery!',
+                hintText: _getCommentHint(),
                 hintStyle: TextStyle(color: Colors.grey[500]),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.orange[600]!),
+                  borderSide: BorderSide(color: Colors.orange[600]!, width: 2),
                 ),
                 contentPadding: const EdgeInsets.all(12),
+                counterStyle: TextStyle(color: Colors.grey[500], fontSize: 11),
               ),
+              validator: _validateComment,
             ),
           ],
         ),
@@ -408,28 +588,46 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
   }
 
   Widget _buildSubmitButton() {
-    return SizedBox(
+    final canSubmit = _canSubmitFeedback();
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _submitFeedback,
+        onPressed: _isLoading || !canSubmit ? null : _submitFeedback,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange[600],
+          backgroundColor:
+              _isLoading
+                  ? Colors.grey[400]
+                  : canSubmit
+                  ? Colors.orange[600]
+                  : Colors.grey[400],
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          elevation: 4,
+          elevation: canSubmit && !_isLoading ? 4 : 1,
         ),
         child:
             _isLoading
-                ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
+                ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _isEditMode ? 'Updating...' : 'Submitting...',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
                 )
                 : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -449,6 +647,43 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
     );
   }
 
+  bool _canSubmitFeedback() {
+    if (!_isEditMode) return true;
+    return _hasUnsavedChanges;
+  }
+
+  String? _validateComment(String? value) {
+    if (value == null) return null;
+
+    final trimmed = value.trim();
+    if (trimmed.length > 500) {
+      return 'Comment must be less than 500 characters';
+    }
+
+    return null;
+  }
+
+  bool _validateRating() {
+    if (_rating < 1.0 || _rating > 5.0) {
+      _showSnackBar(
+        'Please select a rating between 1 and 5 stars',
+        Colors.orange,
+      );
+      return false;
+    }
+    return true;
+  }
+
+  String _getCommentHint() {
+    if (_rating <= 2.0) {
+      return 'What could we improve? Your feedback helps us serve you better...';
+    } else if (_rating >= 4.0) {
+      return 'What did you enjoy most? Share what made your experience great...';
+    } else {
+      return 'Tell us about your experience...\n\nExample: The food was delicious and arrived hot. Great packaging and fast delivery!';
+    }
+  }
+
   String _getRatingText(double rating) {
     if (rating <= 1.5) return 'Poor';
     if (rating <= 2.5) return 'Fair';
@@ -457,10 +692,54 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
     return 'Excellent';
   }
 
-  void _submitFeedback() async {
-    if (_commentController.text.trim().isEmpty && _selectedCategories.isEmpty) {
-      _showSnackBar('Please add a comment or select categories', Colors.orange);
+  Color _getRatingColor(double rating) {
+    if (rating <= 2.0) return _ratingColors['poor']!;
+    if (rating <= 3.0) return _ratingColors['fair']!;
+    if (rating <= 4.0) return _ratingColors['good']!;
+    return _ratingColors['excellent']!;
+  }
+
+  void _handleError(dynamic error, String operation) {
+    String message = 'An error occurred';
+
+    if (error.toString().contains('permission-denied')) {
+      message = 'You don\'t have permission to perform this action';
+    } else if (error.toString().contains('network-request-failed')) {
+      message = 'Network error. Please check your connection';
+    } else if (error.toString().contains('unavailable')) {
+      message = 'Service temporarily unavailable. Please try again';
+    } else if (error.toString().contains('timeout')) {
+      message = 'Request timed out. Please try again';
+    } else if (error.toString().contains('User not authenticated')) {
+      message = 'Please log in to continue';
+    } else {
+      message = 'Failed to $operation. Please try again';
+    }
+
+    _showSnackBar(message, Colors.red);
+  }
+
+  Future<void> _submitFeedback() async {
+    // Validate form
+    if (!_formKey.currentState!.validate()) {
       return;
+    }
+
+    // Validate rating
+    if (!_validateRating()) {
+      return;
+    }
+
+    // Check authentication
+    if (!_feedbackService.isAuthenticated) {
+      _showSnackBar('Please log in to submit feedback', Colors.red);
+      return;
+    }
+
+    // Show confirmation for low ratings
+    if (_rating <= 2.0) {
+      final shouldContinue = await _showLowRatingDialog();
+      if (!shouldContinue) return;
     }
 
     setState(() {
@@ -468,43 +747,107 @@ class _CreateFeedbackPageState extends State<CreateFeedbackPage> {
     });
 
     try {
+      final comment = _commentController.text.trim();
+
       if (_isEditMode) {
+        final feedbackId = widget.existingFeedback?['id'];
+        if (feedbackId == null || feedbackId.isEmpty) {
+          throw Exception('Invalid feedback ID');
+        }
+
         await _feedbackService.updateFeedback(
-          feedbackId: widget.existingFeedback!['id'],
+          feedbackId: feedbackId,
           rating: _rating,
-          comment: _commentController.text.trim(),
+          comment: comment,
           categories: _selectedCategories,
         );
+
         _showSnackBar('Review updated successfully!', Colors.green);
       } else {
         await _feedbackService.submitFeedback(
           rating: _rating,
-          comment: _commentController.text.trim(),
+          comment: comment,
           categories: _selectedCategories,
         );
+
         _showSnackBar('Review submitted successfully!', Colors.green);
       }
 
-      Navigator.pop(context, true); // Return true to indicate success
-    } catch (e) {
-      _showSnackBar(
-        'Failed to ${_isEditMode ? 'update' : 'submit'} review: $e',
-        Colors.red,
-      );
-    } finally {
+      // Update original values after successful submission
+      _originalRating = _rating;
+      _originalComment = comment;
+      _originalCategories = List<String>.from(_selectedCategories);
+
       setState(() {
-        _isLoading = false;
+        _hasUnsavedChanges = false;
       });
+
+      // Small delay to show success message
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint('Error submitting feedback: $e');
+      _handleError(e, _isEditMode ? 'update review' : 'submit review');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
+  Future<bool> _showLowRatingDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Low Rating'),
+            content: const Text(
+              'We\'re sorry to hear about your experience. Your feedback is valuable and helps us improve. Would you like to continue with this rating?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Let me reconsider'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                child: const Text(
+                  'Continue',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+    );
+
+    return result ?? false;
+  }
+
   void _showSnackBar(String message, Color color) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: color,
         behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 3),
+        duration: Duration(seconds: color == Colors.green ? 2 : 4),
+        action:
+            color == Colors.red
+                ? SnackBarAction(
+                  label: 'Retry',
+                  textColor: Colors.white,
+                  onPressed: () => _submitFeedback(),
+                )
+                : null,
       ),
     );
   }

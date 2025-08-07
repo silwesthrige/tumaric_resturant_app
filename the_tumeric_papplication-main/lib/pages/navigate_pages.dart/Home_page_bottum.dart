@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/catogary_model.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
+import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 
 import 'package:the_tumeric_papplication/pages/main_food_disc_page.dart';
+
+import 'package:the_tumeric_papplication/pages/navigate_pages.dart/food%20page/all_food_page.dart';
 import 'package:the_tumeric_papplication/reuse_component/pramotion_card.dart';
 import 'package:the_tumeric_papplication/services/catogary_service.dart';
-
 import 'package:the_tumeric_papplication/services/food_services.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
+import 'package:the_tumeric_papplication/services/rating_service.dart';
 
 import 'package:the_tumeric_papplication/widgets/main_food_card.dart';
 import 'package:the_tumeric_papplication/widgets/mini_card_list_view.dart';
@@ -65,6 +68,7 @@ class _HomePageBottumState extends State<HomePageBottum>
   }
 
   final UserServices _userServices = UserServices();
+  final RatingService _ratingService = RatingService();
   UserModel? currentUser;
   bool isLoading = true;
 
@@ -130,7 +134,7 @@ class _HomePageBottumState extends State<HomePageBottum>
                   // Categories Section
                   _buildCategoriesSection(),
 
-                  // Popular Section
+                  // Popular Section (Modified to use ratings)
                   _buildPopularSection(foodServices),
                 ],
               ),
@@ -386,7 +390,15 @@ class _HomePageBottumState extends State<HomePageBottum>
                 ),
               ),
               GestureDetector(
-                onTap: () {},
+                onTap: () {
+                  // Navigate to all foods page
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AllFoodsPage(),
+                    ),
+                  );
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -422,25 +434,254 @@ class _HomePageBottumState extends State<HomePageBottum>
             ],
           ),
           const SizedBox(height: 16),
-          StreamBuilder(
-            stream: foodServices.getFood(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+          
+          // Use FutureBuilder to get top rated items
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _ratingService.getTopRatedmenusItems(limit: 6),
+            builder: (context, ratingSnapshot) {
+              if (ratingSnapshot.connectionState == ConnectionState.waiting) {
                 return _buildLoadingGrid();
-              } else if (snapshot.hasError) {
-                return _buildErrorWidget("Error: ${snapshot.error}");
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return _buildErrorWidget("No dishes available");
+              } else if (ratingSnapshot.hasError) {
+                // Fallback to regular food stream if rating service fails
+                return _buildFallbackFoodGrid(foodServices);
+              } else if (!ratingSnapshot.hasData || ratingSnapshot.data!.isEmpty) {
+                // Fallback to regular food stream if no rated items
+                return _buildFallbackFoodGrid(foodServices);
               } else {
-                final foods = snapshot.data!;
-
-                return _buildFoodGrid(foods);
+                final topRatedItems = ratingSnapshot.data!;
+                return _buildTopRatedFoodGrid(topRatedItems);
               }
             },
           ),
           const SizedBox(height: 30),
         ],
       ),
+    );
+  }
+
+  // Build grid for top rated items with rating display
+  Widget _buildTopRatedFoodGrid(List<Map<String, dynamic>> topRatedItems) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: topRatedItems.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16.0,
+        mainAxisSpacing: 16.0,
+        childAspectRatio: 0.7, // Made slightly taller to accommodate rating
+      ),
+      itemBuilder: (context, index) {
+        final foodData = topRatedItems[index];
+        
+        return AnimatedContainer(
+          duration: Duration(milliseconds: 300 + (index * 100)),
+          curve: Curves.easeOutBack,
+          child: Hero(
+            tag: "food_${foodData['foodName'] ?? 'unknown'}_$index",
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // Rating Badge
+                  Container(
+                    margin: const EdgeInsets.all(8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF6B35),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                "${foodData['averageRating'] ?? 0.0}",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if ((foodData['totalRatings'] ?? 0) > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              "${foodData['totalRatings']} reviews",
+                              style: const TextStyle(
+                                color: Colors.green,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Use MainFoodCard but with additional rating info
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation, secondaryAnimation) =>
+                                MainFoodDiscPage(
+                                  foodId: foodData['id'] ?? '',
+                                  title: foodData['foodName'] ?? 'Unknown',
+                                  disc: foodData['discription'] ?? '',
+                                  imageUrl: foodData['imageUrl'] ?? '',
+                                  price: (foodData['price'] ?? 0.0).toDouble(),
+                                  time: foodData['cookedTime'] ?? 0,
+                                ),
+                            transitionsBuilder: (
+                              context,
+                              animation,
+                              secondaryAnimation,
+                              child,
+                            ) {
+                              return SlideTransition(
+                                position: animation.drive(
+                                  Tween(
+                                    begin: const Offset(1.0, 0.0),
+                                    end: Offset.zero,
+                                  ).chain(CurveTween(curve: Curves.ease)),
+                                ),
+                                child: child,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                        child: Column(
+                          children: [
+                            // Food Image
+                            Expanded(
+                              flex: 3,
+                              child: Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(15),
+                                  image: DecorationImage(
+                                    image: NetworkImage(foodData['imageUrl'] ?? ''),
+                                    fit: BoxFit.cover,
+                                    onError: (error, stackTrace) {
+                                      // Handle image loading error
+                                    },
+                                  ),
+                                ),
+                                child: foodData['imageUrl'] == null || foodData['imageUrl'] == ''
+                                    ? Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(15),
+                                          color: Colors.grey.shade200,
+                                        ),
+                                        child: const Icon(
+                                          Icons.fastfood,
+                                          size: 50,
+                                          color: Colors.grey,
+                                        ),
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            
+                            // Food Details
+                            Expanded(
+                              flex: 2,
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      foodData['foodName'] ?? 'Unknown',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF2E3192),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      "\${(foodData['price'] ?? 0.0).toStringAsFixed(2)}",
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFFF6B35),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Fallback grid using regular food stream
+  Widget _buildFallbackFoodGrid(FoodServices foodServices) {
+    return StreamBuilder(
+      stream: foodServices.getFood(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildLoadingGrid();
+        } else if (snapshot.hasError) {
+          return _buildErrorWidget("Error: ${snapshot.error}");
+        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return _buildErrorWidget("No dishes available");
+        } else {
+          final foods = snapshot.data!;
+          return _buildFoodGrid(foods);
+        }
+      },
     );
   }
 
@@ -477,7 +718,7 @@ class _HomePageBottumState extends State<HomePageBottum>
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: availableFoods.length,
+      itemCount: availableFoods.length > 6 ? 6 : availableFoods.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 16.0,
