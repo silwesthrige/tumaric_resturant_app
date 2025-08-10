@@ -11,6 +11,7 @@ import 'package:the_tumeric_papplication/services/catogary_service.dart';
 import 'package:the_tumeric_papplication/services/food_services.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
 import 'package:the_tumeric_papplication/services/rating_service.dart';
+import 'package:the_tumeric_papplication/utils/colors.dart';
 
 import 'package:the_tumeric_papplication/widgets/main_food_card.dart';
 import 'package:the_tumeric_papplication/widgets/mini_card_list_view.dart';
@@ -30,11 +31,22 @@ class _HomePageBottumState extends State<HomePageBottum>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // Search functionality
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<FoodDetailModel> _allFoods = [];
+  List<FoodDetailModel> _filteredFoods = [];
+  bool _isSearching = false;
+  String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
     _loadUserDetails();
     fetchUserData();
+    _setupSearchListener();
+    _loadAllFoods();
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -60,10 +72,99 @@ class _HomePageBottumState extends State<HomePageBottum>
     _slideController.forward();
   }
 
+  void _setupSearchListener() {
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text;
+        _isSearching = _searchQuery.isNotEmpty;
+        if (_isSearching) {
+          _filterFoods(_searchQuery);
+        }
+      });
+    });
+  }
+
+  void _loadAllFoods() async {
+    try {
+      final foodServices = FoodServices();
+      foodServices.getFood().listen((foods) {
+        setState(() {
+          _allFoods =
+              foods.where((food) => food.status == 'available').toList();
+        });
+      });
+    } catch (e) {
+      print("Error loading foods: $e");
+    }
+  }
+
+  void _filterFoods(String query) {
+    if (query.isEmpty) {
+      _filteredFoods = [];
+      return;
+    }
+
+    _filteredFoods =
+        _allFoods.where((food) {
+          return food.foodName.toLowerCase().contains(query.toLowerCase()) ||
+              food.discription.toLowerCase().contains(query.toLowerCase()) ||
+              food.shortDisc.toLowerCase().contains(query.toLowerCase());
+        }).toList();
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchQuery = '';
+      _isSearching = false;
+      _filteredFoods = [];
+    });
+    _searchFocusNode.unfocus();
+  }
+
+  // Dynamic greeting based on time
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    String greeting;
+    String emoji;
+
+    if (hour >= 5 && hour < 12) {
+      greeting = "Good Morning";
+      emoji = "🌅";
+    } else if (hour >= 12 && hour < 17) {
+      greeting = "Good Afternoon";
+      emoji = "☀️";
+    } else if (hour >= 17 && hour < 21) {
+      greeting = "Good Evening";
+      emoji = "🌆";
+    } else {
+      greeting = "Good Night";
+      emoji = "🌙";
+    }
+
+    return "$greeting! $emoji";
+  }
+
+  String _getGreetingSubtext() {
+    final hour = DateTime.now().hour;
+
+    if (hour >= 5 && hour < 12) {
+      return "Ready to start your day with delicious food?";
+    } else if (hour >= 12 && hour < 17) {
+      return "Time for a delightful lunch break!";
+    } else if (hour >= 17 && hour < 21) {
+      return "What's for dinner tonight?";
+    } else {
+      return "Craving a late night snack?";
+    }
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
     _slideController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -74,12 +175,10 @@ class _HomePageBottumState extends State<HomePageBottum>
 
   String? _userAddress;
   void _loadUserDetails() async {
-    final user =
-        await UserServices().getCurrentUserDetails(); // or your service class
+    final user = await UserServices().getCurrentUserDetails();
     if (user != null && mounted) {
       setState(() {
-        _userAddress =
-            user.address; // change this if your field is named differently
+        _userAddress = user.address;
       });
     }
   }
@@ -89,19 +188,21 @@ class _HomePageBottumState extends State<HomePageBottum>
       isLoading = true;
     });
     try {
-      // Use the stream to listen for real-time updates or just get the first value
       final userStream = _userServices.getCurrentUserDetails();
       currentUser = await userStream;
     } catch (e) {
       print("Error fetching user data: $e");
-      // Handle error, e.g., show a snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load profile data: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load profile data: $e')),
+        );
+      }
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -109,6 +210,7 @@ class _HomePageBottumState extends State<HomePageBottum>
   Widget build(BuildContext context) {
     final foodServices = FoodServices();
     final catogaryService = CatogaryService();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: _buildAppBar(),
@@ -128,14 +230,15 @@ class _HomePageBottumState extends State<HomePageBottum>
                   // Search Bar Section
                   _buildSearchSection(),
 
-                  // Promotions Section
-                  _buildPromotionsSection(),
-
-                  // Categories Section
-                  _buildCategoriesSection(),
-
-                  // Popular Section (Modified to use ratings)
-                  _buildPopularSection(foodServices),
+                  // Show search results or normal content
+                  if (_isSearching && _searchQuery.isNotEmpty)
+                    _buildSearchResults()
+                  else ...[
+                    // Normal content when not searching
+                    _buildPromotionsSection(),
+                    _buildCategoriesSection(),
+                    _buildPopularSection(foodServices),
+                  ],
                 ],
               ),
             ),
@@ -151,11 +254,11 @@ class _HomePageBottumState extends State<HomePageBottum>
       elevation: 0,
       backgroundColor: Colors.transparent,
       flexibleSpace: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
+            colors: [Color(0xFFF4A300), Color(0xFFFFD166)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFFFF6B35), Color(0xFFFF8E53)],
           ),
         ),
       ),
@@ -186,11 +289,11 @@ class _HomePageBottumState extends State<HomePageBottum>
   Widget _buildWelcomeHeader() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
+          colors: [Color(0xFFF4A300), Color(0xFFFFD166)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFF6B35), Color(0xFFFF8E53)],
         ),
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(30),
@@ -200,18 +303,18 @@ class _HomePageBottumState extends State<HomePageBottum>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            "Good Morning! 👋",
+          Text(
+            _getGreeting(),
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: kmainWhite,
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            "What would you like to eat today?",
-            style: TextStyle(fontSize: 16, color: Colors.white70),
+          Text(
+            _getGreetingSubtext(),
+            style: const TextStyle(fontSize: 16, color: Colors.white70),
           ),
           const SizedBox(height: 20),
           Container(
@@ -235,7 +338,11 @@ class _HomePageBottumState extends State<HomePageBottum>
                     ),
                   ),
                 ),
-                Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
+                const Icon(
+                  Icons.keyboard_arrow_down,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -259,7 +366,143 @@ class _HomePageBottumState extends State<HomePageBottum>
             ),
           ],
         ),
-        child: Search_Bar(),
+        child: TextField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          decoration: InputDecoration(
+            hintText: "Search for delicious food...",
+            hintStyle: TextStyle(color: Colors.grey[400]),
+            prefixIcon: const Icon(
+              Icons.search,
+              color: Color(0xFFFF6B35),
+              size: 24,
+            ),
+            suffixIcon:
+                _isSearching
+                    ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.grey),
+                      onPressed: _clearSearch,
+                    )
+                    : const Icon(Icons.tune, color: Colors.grey),
+            border: InputBorder.none,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 16,
+            ),
+          ),
+          onSubmitted: (value) {
+            if (value.isNotEmpty) {
+              _filterFoods(value);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_filteredFoods.isEmpty) {
+      return Container(
+        height: 300,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                "No dishes found for '$_searchQuery'",
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                "Try searching with different keywords",
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 10),
+          Text(
+            "🔍 Search Results (${_filteredFoods.length} found)",
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2E3192),
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredFoods.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16.0,
+              mainAxisSpacing: 16.0,
+              childAspectRatio: 0.75,
+            ),
+            itemBuilder: (context, index) {
+              final food = _filteredFoods[index];
+              return AnimatedContainer(
+                duration: Duration(milliseconds: 300 + (index * 100)),
+                curve: Curves.easeOutBack,
+                child: MainFoodCard(
+                  food: food,
+                  title: food.foodName,
+                  imageUrl: food.imageUrl,
+                  price: food.price,
+                  ontap: () {
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder:
+                            (context, animation, secondaryAnimation) =>
+                                MainFoodDiscPage(
+                                  foodId: food.foodId.toString(),
+                                  title: food.foodName,
+                                  disc: food.discription,
+                                  imageUrl: food.imageUrl,
+                                  price: food.price,
+                                  time: food.cookedTime,
+                                ),
+                        transitionsBuilder: (
+                          context,
+                          animation,
+                          secondaryAnimation,
+                          child,
+                        ) {
+                          return SlideTransition(
+                            position: animation.drive(
+                              Tween(
+                                begin: const Offset(1.0, 0.0),
+                                end: Offset.zero,
+                              ).chain(CurveTween(curve: Curves.ease)),
+                            ),
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 30),
+        ],
       ),
     );
   }
@@ -273,12 +516,12 @@ class _HomePageBottumState extends State<HomePageBottum>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "🔥 Special Offers",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2E3192),
+                  color: textPrimary,
                 ),
               ),
               Container(
@@ -287,13 +530,13 @@ class _HomePageBottumState extends State<HomePageBottum>
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B35).withOpacity(0.1),
+                  color: kMainOrange.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: const Text(
+                child: Text(
                   "Limited Time",
                   style: TextStyle(
-                    color: Color(0xFFFF6B35),
+                    color: kMainOrange,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -302,7 +545,7 @@ class _HomePageBottumState extends State<HomePageBottum>
             ],
           ),
           const SizedBox(height: 16),
-          PramotionCard(),
+          PromotionCard(),
           const SizedBox(height: 30),
         ],
       ),
@@ -315,12 +558,12 @@ class _HomePageBottumState extends State<HomePageBottum>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "🍽️ Categories",
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2E3192),
+              color: textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -381,22 +624,19 @@ class _HomePageBottumState extends State<HomePageBottum>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 "⭐ Popular Dishes",
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2E3192),
+                  color: textPrimary,
                 ),
               ),
               GestureDetector(
                 onTap: () {
-                  // Navigate to all foods page
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => AllFoodsPage(),
-                    ),
+                    MaterialPageRoute(builder: (context) => AllFoodsPage()),
                   );
                 },
                 child: Container(
@@ -405,8 +645,8 @@ class _HomePageBottumState extends State<HomePageBottum>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B35), Color(0xFFFF8E53)],
+                    gradient: LinearGradient(
+                      colors: [kMainOrange, Color(0xFFFF8E53)],
                     ),
                     borderRadius: BorderRadius.circular(20),
                   ),
@@ -434,8 +674,8 @@ class _HomePageBottumState extends State<HomePageBottum>
             ],
           ),
           const SizedBox(height: 16),
-          
-          // Use FutureBuilder to get top rated items
+
+          // Use FutureBuilder to get top rated items, but use MainFoodCard for display
           FutureBuilder<List<Map<String, dynamic>>>(
             future: _ratingService.getTopRatedmenusItems(limit: 6),
             builder: (context, ratingSnapshot) {
@@ -444,12 +684,13 @@ class _HomePageBottumState extends State<HomePageBottum>
               } else if (ratingSnapshot.hasError) {
                 // Fallback to regular food stream if rating service fails
                 return _buildFallbackFoodGrid(foodServices);
-              } else if (!ratingSnapshot.hasData || ratingSnapshot.data!.isEmpty) {
+              } else if (!ratingSnapshot.hasData ||
+                  ratingSnapshot.data!.isEmpty) {
                 // Fallback to regular food stream if no rated items
                 return _buildFallbackFoodGrid(foodServices);
               } else {
                 final topRatedItems = ratingSnapshot.data!;
-                return _buildTopRatedFoodGrid(topRatedItems);
+                return _buildTopRatedFoodGridWithMainFoodCard(topRatedItems);
               }
             },
           ),
@@ -459,8 +700,10 @@ class _HomePageBottumState extends State<HomePageBottum>
     );
   }
 
-  // Build grid for top rated items with rating display
-  Widget _buildTopRatedFoodGrid(List<Map<String, dynamic>> topRatedItems) {
+  // Build grid for top rated items using MainFoodCard with rating badge overlay
+  Widget _buildTopRatedFoodGridWithMainFoodCard(
+    List<Map<String, dynamic>> topRatedItems,
+  ) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -469,206 +712,148 @@ class _HomePageBottumState extends State<HomePageBottum>
         crossAxisCount: 2,
         crossAxisSpacing: 16.0,
         mainAxisSpacing: 16.0,
-        childAspectRatio: 0.7, // Made slightly taller to accommodate rating
+        childAspectRatio: 0.75,
       ),
       itemBuilder: (context, index) {
         final foodData = topRatedItems[index];
-        
+
+        // Convert the rating data to FoodDetailModel
+        final foodModel = FoodDetailModel(
+          foodId: foodData['id'] ?? '',
+          foodName: foodData['foodName'] ?? 'Unknown',
+          discription: foodData['discription'] ?? '',
+          imageUrl: foodData['imageUrl'] ?? '',
+          price: ((foodData['price'] as num).toDouble() ?? 0.0),
+          cookedTime: (foodData['cookedTime'] as num).toDouble() ?? 0,
+          status: 'available',
+          shortDisc: foodData['shortDisc'] ?? '',
+        );
+
         return AnimatedContainer(
           duration: Duration(milliseconds: 300 + (index * 100)),
           curve: Curves.easeOutBack,
-          child: Hero(
-            tag: "food_${foodData['foodName'] ?? 'unknown'}_$index",
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // Rating Badge
-                  Container(
-                    margin: const EdgeInsets.all(8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFF6B35),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.star,
-                                color: Colors.white,
-                                size: 14,
+          child: Stack(
+            children: [
+              // MainFoodCard
+              MainFoodCard(
+                food: foodModel,
+                title: foodModel.foodName,
+                imageUrl: foodModel.imageUrl,
+                price: foodModel.price,
+                ontap: () {
+                  Navigator.push(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder:
+                          (context, animation, secondaryAnimation) =>
+                              MainFoodDiscPage(
+                                foodId: foodModel.foodId.toString(),
+                                title: foodModel.foodName,
+                                disc: foodModel.discription,
+                                imageUrl: foodModel.imageUrl,
+                                price: foodModel.price,
+                                time: foodModel.cookedTime,
                               ),
-                              const SizedBox(width: 2),
-                              Text(
-                                "${foodData['averageRating'] ?? 0.0}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
+                      transitionsBuilder: (
+                        context,
+                        animation,
+                        secondaryAnimation,
+                        child,
+                      ) {
+                        return SlideTransition(
+                          position: animation.drive(
+                            Tween(
+                              begin: const Offset(1.0, 0.0),
+                              end: Offset.zero,
+                            ).chain(CurveTween(curve: Curves.ease)),
                           ),
-                        ),
-                        if ((foodData['totalRatings'] ?? 0) > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              "${foodData['totalRatings']} reviews",
-                              style: const TextStyle(
-                                color: Colors.green,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  
-                  // Use MainFoodCard but with additional rating info
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (context, animation, secondaryAnimation) =>
-                                MainFoodDiscPage(
-                                  foodId: foodData['id'] ?? '',
-                                  title: foodData['foodName'] ?? 'Unknown',
-                                  disc: foodData['discription'] ?? '',
-                                  imageUrl: foodData['imageUrl'] ?? '',
-                                  price: (foodData['price'] ?? 0.0).toDouble(),
-                                  time: foodData['cookedTime'] ?? 0,
-                                ),
-                            transitionsBuilder: (
-                              context,
-                              animation,
-                              secondaryAnimation,
-                              child,
-                            ) {
-                              return SlideTransition(
-                                position: animation.drive(
-                                  Tween(
-                                    begin: const Offset(1.0, 0.0),
-                                    end: Offset.zero,
-                                  ).chain(CurveTween(curve: Curves.ease)),
-                                ),
-                                child: child,
-                              );
-                            },
-                          ),
+                          child: child,
                         );
                       },
-                      child: Container(
-                        margin: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                        child: Column(
-                          children: [
-                            // Food Image
-                            Expanded(
-                              flex: 3,
-                              child: Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(15),
-                                  image: DecorationImage(
-                                    image: NetworkImage(foodData['imageUrl'] ?? ''),
-                                    fit: BoxFit.cover,
-                                    onError: (error, stackTrace) {
-                                      // Handle image loading error
-                                    },
-                                  ),
-                                ),
-                                child: foodData['imageUrl'] == null || foodData['imageUrl'] == ''
-                                    ? Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(15),
-                                          color: Colors.grey.shade200,
-                                        ),
-                                        child: const Icon(
-                                          Icons.fastfood,
-                                          size: 50,
-                                          color: Colors.grey,
-                                        ),
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            
-                            // Food Details
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      foodData['foodName'] ?? 'Unknown',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF2E3192),
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      "\${(foodData['price'] ?? 0.0).toStringAsFixed(2)}",
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFFFF6B35),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                    ),
+                  );
+                },
+              ),
+
+              // Rating Badge Overlay
+              Positioned(
+                top: 8,
+                left: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF6B35),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, color: Colors.white, size: 12),
+                      const SizedBox(width: 2),
+                      Text(
+                        "${(foodData['averageRating'] ?? 0.0).toStringAsFixed(1)}",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Review count badge (if available)
+              if ((foodData['totalRatings'] ?? 0) > 0)
+                Positioned(
+                  top: 35,
+                  left: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 2,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      "${foodData['totalRatings']}",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
         );
       },
     );
   }
 
-  // Fallback grid using regular food stream
+  // Fallback grid using regular food stream with MainFoodCard
   Widget _buildFallbackFoodGrid(FoodServices foodServices) {
-    return StreamBuilder(
+    return StreamBuilder<List<FoodDetailModel>>(
       stream: foodServices.getFood(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -679,7 +864,74 @@ class _HomePageBottumState extends State<HomePageBottum>
           return _buildErrorWidget("No dishes available");
         } else {
           final foods = snapshot.data!;
-          return _buildFoodGrid(foods);
+          final availableFoods =
+              foods.where((food) => food.status == 'available').toList();
+          final displayFoods =
+              availableFoods.length > 6
+                  ? availableFoods.take(6).toList()
+                  : availableFoods;
+
+          return GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: displayFoods.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16.0,
+              mainAxisSpacing: 16.0,
+              childAspectRatio: 0.75,
+            ),
+            itemBuilder: (context, index) {
+              final food = displayFoods[index];
+
+              return AnimatedContainer(
+                duration: Duration(milliseconds: 300 + (index * 100)),
+                curve: Curves.easeOutBack,
+                child: Hero(
+                  tag: "food_${food.foodName}_$index",
+                  child: MainFoodCard(
+                    food: food,
+                    title: food.foodName,
+                    imageUrl: food.imageUrl,
+                    price: food.price,
+                    ontap: () {
+                      Navigator.push(
+                        context,
+                        PageRouteBuilder(
+                          pageBuilder:
+                              (context, animation, secondaryAnimation) =>
+                                  MainFoodDiscPage(
+                                    foodId: food.foodId.toString(),
+                                    title: food.foodName,
+                                    disc: food.discription,
+                                    imageUrl: food.imageUrl,
+                                    price: food.price,
+                                    time: food.cookedTime,
+                                  ),
+                          transitionsBuilder: (
+                            context,
+                            animation,
+                            secondaryAnimation,
+                            child,
+                          ) {
+                            return SlideTransition(
+                              position: animation.drive(
+                                Tween(
+                                  begin: const Offset(1.0, 0.0),
+                                  end: Offset.zero,
+                                ).chain(CurveTween(curve: Curves.ease)),
+                              ),
+                              child: child,
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+          );
         }
       },
     );
@@ -705,85 +957,6 @@ class _HomePageBottumState extends State<HomePageBottum>
           child: const Center(
             child: CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFoodGrid(List foods) {
-    final availableFoods =
-        foods.where((food) => food.status == 'available').toList();
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: availableFoods.length > 6 ? 6 : availableFoods.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16.0,
-        mainAxisSpacing: 16.0,
-        childAspectRatio: 0.75,
-      ),
-      itemBuilder: (context, index) {
-        final food = availableFoods[index];
-
-        return AnimatedContainer(
-          duration: Duration(milliseconds: 300 + (index * 100)),
-          curve: Curves.easeOutBack,
-          child: Hero(
-            tag: "food_${food.foodName}_$index",
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.15),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: MainFoodCard(
-                food: food,
-                title: food.foodName,
-                imageUrl: food.imageUrl,
-                price: food.price,
-                ontap: () {
-                  Navigator.push(
-                    context,
-                    PageRouteBuilder(
-                      pageBuilder:
-                          (context, animation, secondaryAnimation) =>
-                              MainFoodDiscPage(
-                                foodId: food.foodId,
-                                title: food.foodName,
-                                disc: food.discription,
-                                imageUrl: food.imageUrl,
-                                price: food.price,
-                                time: food.cookedTime,
-                              ),
-                      transitionsBuilder: (
-                        context,
-                        animation,
-                        secondaryAnimation,
-                        child,
-                      ) {
-                        return SlideTransition(
-                          position: animation.drive(
-                            Tween(
-                              begin: const Offset(1.0, 0.0),
-                              end: Offset.zero,
-                            ).chain(CurveTween(curve: Curves.ease)),
-                          ),
-                          child: child,
-                        );
-                      },
-                    ),
-                  );
-                },
-              ),
             ),
           ),
         );

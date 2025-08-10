@@ -50,6 +50,19 @@ class UserServices {
     }
   }
 
+  // Update profile picture URL
+  Future<void> updateProfilePicture(String userId, String profileImageUrl) async {
+    try {
+      await _userCollection.doc(userId).update({
+        'profileImageUrl': profileImageUrl,
+      });
+      print("Profile picture updated successfully for ID: $userId");
+    } catch (e) {
+      print("Error updating profile picture for ID: $userId, Error: $e");
+      rethrow;
+    }
+  }
+
   // Example: update only specific fields
   Future<void> updateSpecificUserDetails(
       String userId, Map<String, dynamic> data) async {

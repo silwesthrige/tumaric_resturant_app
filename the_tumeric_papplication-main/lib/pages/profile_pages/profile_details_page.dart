@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart'; // Adjust path
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
+import 'package:the_tumeric_papplication/services/profile_picture_service.dart'; // Add this import
 
 class ProfileDetailsPage extends StatefulWidget {
   final UserModel?
@@ -14,12 +17,17 @@ class ProfileDetailsPage extends StatefulWidget {
 
 class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
   final _formKey = GlobalKey<FormState>();
+  final ProfilePictureService _profilePictureService = ProfilePictureService();
+  final UserServices _userServices = UserServices();
+
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _addressController;
 
   bool _isSaving = false; // To show loading indicator on save button
+  bool _isUploadingImage = false; // To show loading indicator for image upload
+  String? _currentProfileImageUrl; // Track current profile image URL
 
   @override
   void initState() {
@@ -37,6 +45,105 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
     _addressController = TextEditingController(
       text: widget.currentUser?.address ?? '',
     );
+    _currentProfileImageUrl = widget.currentUser?.profileImageUrl;
+  }
+
+  Future<void> _changeProfilePicture() async {
+    try {
+      // Show image source selection dialog
+      final ImageSource? source = await _profilePictureService
+          .showImageSourceDialog(context);
+      if (source == null) return;
+
+      // Pick image
+      final File? imageFile = await _profilePictureService.pickImage(
+        source: source,
+      );
+      if (imageFile == null) return;
+
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                CircularProgressIndicator(color: Colors.white),
+                SizedBox(width: 16),
+                Text('Uploading profile picture...'),
+              ],
+            ),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 10),
+          ),
+        );
+      }
+
+      // Delete old profile picture if exists
+      if (_currentProfileImageUrl != null &&
+          _currentProfileImageUrl!.isNotEmpty) {
+        await _profilePictureService.deleteProfilePicture(
+          _currentProfileImageUrl!,
+        );
+      }
+
+      // Upload new image
+      final String? downloadUrl = await _profilePictureService
+          .uploadProfilePicture(imageFile);
+
+      if (downloadUrl != null && widget.currentUser != null) {
+        // Update user profile in Firestore
+        await _userServices.updateProfilePicture(
+          widget.currentUser!.uID,
+          downloadUrl,
+        );
+
+        if (mounted) {
+          // Hide loading snackbar
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+          // Update local state
+          setState(() {
+            _currentProfileImageUrl = downloadUrl;
+          });
+
+          // Show success message
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to upload profile picture'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print("Error changing profile picture: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -63,11 +170,12 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
         address: _addressController.text.trim(),
-        // profileImageUrl: currentProfileImageUrl, // If you implement image upload
+        profileImageUrl:
+            _currentProfileImageUrl, // Include the updated profile image URL
       );
 
       try {
-        await UserServices().updateUserDetails(updatedUser);
+        await _userServices.updateUserDetails(updatedUser);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Profile updated successfully!')),
@@ -106,22 +214,20 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
           key: _formKey,
           child: Column(
             children: [
-              // Profile Image Section
+              // Profile Image Section with Edit Functionality
               Center(
                 child: Stack(
                   children: [
                     CircleAvatar(
                       radius: 60,
                       backgroundImage:
-                          widget.currentUser?.profileImageUrl != null
-                              ? NetworkImage(
-                                widget.currentUser!.profileImageUrl!,
-                              )
+                          _currentProfileImageUrl != null
+                              ? NetworkImage(_currentProfileImageUrl!)
                               : const AssetImage('assets/images/profile.jpg')
                                   as ImageProvider,
                       backgroundColor: Colors.grey,
                       child:
-                          widget.currentUser?.profileImageUrl == null
+                          _currentProfileImageUrl == null
                               ? const Icon(
                                 Icons.person,
                                 size: 60,
@@ -132,26 +238,36 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                     Positioned(
                       bottom: 0,
                       right: 0,
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.orange,
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          onPressed: () {
-                            // Add image picker logic here (e.g., using image_picker package)
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Image picker not implemented yet!',
-                                ),
+                      child: GestureDetector(
+                        onTap: _isUploadingImage ? null : _changeProfilePicture,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: const BoxDecoration(
+                            color: Colors.orange,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
                               ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.camera_alt,
-                            color: Colors.white,
+                            ],
                           ),
+                          child:
+                              _isUploadingImage
+                                  ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                  : const Icon(
+                                    Icons.camera_alt,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                         ),
                       ),
                     ),
@@ -197,7 +313,8 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveProfile,
+                  onPressed:
+                      (_isSaving || _isUploadingImage) ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
@@ -214,6 +331,16 @@ class _ProfileDetailsPageState extends State<ProfileDetailsPage> {
                           ),
                 ),
               ),
+
+              const SizedBox(height: 10),
+
+              // Information text
+              if (_isUploadingImage)
+                const Text(
+                  'Please wait while your profile picture is being uploaded...',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                  textAlign: TextAlign.center,
+                ),
             ],
           ),
         ),

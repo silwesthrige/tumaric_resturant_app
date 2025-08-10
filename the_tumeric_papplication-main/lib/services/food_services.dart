@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 
-
 class FoodServices {
   final CollectionReference _FoodCollection = FirebaseFirestore.instance
       .collection("menus");
@@ -28,12 +27,13 @@ class FoodServices {
     ).showSnackBar(SnackBar(content: Text("UserID ${Uid}")));
   }
 
-  Future<void> addToCart(BuildContext context, String foodId,String uid) async {
+  Future<void> addToCart(
+    BuildContext context,
+    String foodId,
+    String uid,
+  ) async {
     try {
-      
-      final userRef = FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid);
+      final userRef = FirebaseFirestore.instance.collection("users").doc(uid);
 
       await userRef.update({
         "cart": FieldValue.arrayUnion([foodId]),
@@ -50,11 +50,13 @@ class FoodServices {
     }
   }
 
-  Future<void> removeFromCart(BuildContext context, String foodId,String uid) async {
+  Future<void> removeFromCart(
+    BuildContext context,
+    String foodId,
+    String uid,
+  ) async {
     try {
-      final userRef = FirebaseFirestore.instance
-          .collection("users")
-          .doc(uid);
+      final userRef = FirebaseFirestore.instance.collection("users").doc(uid);
 
       await userRef.update({
         "cart": FieldValue.arrayRemove([foodId]),

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart'; // Adjust path
+import 'package:the_tumeric_papplication/pages/profile_pages/contact_us_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/feedback_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/resturant_page.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
+import 'package:the_tumeric_papplication/widgets/profile_page_tabs.dart';
+import 'package:the_tumeric_papplication/widgets/profile_picture_widget.dart'; // Import the profile picture widget
 import 'package:firebase_auth/firebase_auth.dart'
     as fb_auth; // Alias to avoid conflict
 
@@ -19,30 +23,70 @@ class _ProfilePageState extends State<ProfilePage> {
   final UserServices _userServices = UserServices();
   UserModel? _currentUser;
   bool _isLoading = true;
+  bool _isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    _fetchUserData();
+    _checkLoginStatus();
   }
 
-  Future<void> _fetchUserData() async {
+  Future<void> _checkLoginStatus() async {
     setState(() {
       _isLoading = true;
     });
+
     try {
-      // Use the stream to listen for real-time updates or just get the first value
-      final userStream = _userServices.getCurrentUserDetails();
-      _currentUser = await userStream;
+      // Check if user is logged in with Firebase Auth
+      final user = fb_auth.FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        setState(() {
+          _isLoggedIn = true;
+        });
+        await _fetchUserData();
+      } else {
+        setState(() {
+          _isLoggedIn = false;
+        });
+      }
     } catch (e) {
-      print("Error fetching user data: $e");
-      // Handle error, e.g., show a snackbar
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load profile data: $e')),
-      );
+      print("Error checking login status: $e");
+      setState(() {
+        _isLoggedIn = false;
+      });
     } finally {
       setState(() {
         _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchUserData() async {
+    try {
+      // Use the stream to listen for real-time updates or just get the first value
+      final userStream = _userServices.getCurrentUserDetails();
+      final userModel = await userStream;
+      if (mounted) {
+        setState(() {
+          _currentUser = userModel;
+        });
+      }
+    } catch (e) {
+      print("Error fetching user data: $e");
+      // Handle error, e.g., show a snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load profile data: $e')),
+        );
+      }
+    }
+  }
+
+  // Callback function when profile picture is updated
+  void _onProfileImageUpdated(String newImageUrl) {
+    if (mounted && _currentUser != null) {
+      setState(() {
+        _currentUser = _currentUser!.copyWith(profileImageUrl: newImageUrl);
       });
     }
   }
@@ -53,6 +97,7 @@ class _ProfilePageState extends State<ProfilePage> {
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         title: const Text('Profile'),
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -62,198 +107,265 @@ class _ProfilePageState extends State<ProfilePage> {
               ? const Center(
                 child: CircularProgressIndicator(color: Colors.orange),
               )
-              : SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // Profile Header Section
-                    Container(
-                      width: double.infinity,
-                      decoration: const BoxDecoration(
-                        color: Colors.orange,
-                        borderRadius: BorderRadius.only(
-                          bottomLeft: Radius.circular(30),
-                          bottomRight: Radius.circular(30),
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 30),
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundImage:
-                                  _currentUser?.profileImageUrl != null
-                                      ? NetworkImage(
-                                        _currentUser!.profileImageUrl!,
-                                      )
-                                      : const AssetImage(
-                                            'assets/images/profile.jpg',
-                                          )
-                                          as ImageProvider, // Default image
-                              backgroundColor: Colors.white,
-                              child:
-                                  _currentUser?.profileImageUrl == null
-                                      ? const Icon(
-                                        Icons.person,
-                                        size: 50,
-                                        color: Colors.grey,
-                                      )
-                                      : null,
-                            ),
-                            const SizedBox(height: 15),
-                            Text(
-                              _currentUser?.name ??
-                                  "User Name", // Default if null
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              _currentUser?.email ??
-                                  "user@example.com", // Default if null
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white70,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: const Text(
-                                'Verified Customer',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+              : _isLoggedIn
+              ? _buildLoggedInProfile()
+              : _buildLoginPrompt(),
+    );
+  }
+
+  Widget _buildLoggedInProfile() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Profile Header Section
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              color: Colors.orange,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(30),
+                bottomRight: Radius.circular(30),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 30),
+              child: Column(
+                children: [
+                  // Profile Picture Widget with edit functionality
+                  ProfilePictureWidget(
+                    currentUser: _currentUser,
+                    onImageUpdated: _onProfileImageUpdated,
+                  ),
+
+                  const SizedBox(height: 15),
+                  Text(
+                    _currentUser?.name ?? "User Name", // Default if null
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
                     ),
+                  ),
+                  Text(
+                    _currentUser?.email ??
+                        "user@example.com", // Default if null
+                    style: const TextStyle(fontSize: 16, color: Colors.white70),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Text(
+                      'Verified Customer',
+                      style: TextStyle(color: Colors.white, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
 
-                    const SizedBox(height: 20),
+          const SizedBox(height: 20),
 
-                    // Menu Items
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          _buildMenuCard(
-                            context,
-                            icon: Icons.person_outline,
-                            title: 'Profile Details',
-                            subtitle: 'Manage your personal information',
-                            onTap: () async {
-                              // Navigate and wait for result (if details were updated)
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) => ProfileDetailsPage(
-                                        currentUser:
-                                            _currentUser, // Pass current user data
-                                      ),
-                                ),
-                              );
-                              if (result == true) {
-                                _fetchUserData(); // Refresh data if updated
-                              }
-                            },
-                          ),
+          // Menu Items
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: [
+                _buildMenuCard(
+                  context,
+                  icon: Icons.person_outline,
+                  title: 'Profile Details',
+                  subtitle: 'Manage your personal information',
+                  onTap: () async {
+                    // Navigate and wait for result (if details were updated)
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => ProfileDetailsPage(
+                              currentUser:
+                                  _currentUser, // Pass current user data
+                            ),
+                      ),
+                    );
+                    if (result == true) {
+                      _fetchUserData(); // Refresh data if updated
+                    }
+                  },
+                ),
 
-                          _buildMenuCard(
-                            context,
-                            icon: Icons.history,
-                            title: 'Order History',
-                            subtitle: 'View your past orders',
-                            onTap:
-                                () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => OrdersPage(),
-                                  ),
-                                ),
-                          ),
+                _buildMenuCard(
+                  context,
+                  icon: Icons.history,
+                  title: 'Order History',
+                  subtitle: 'View your past orders',
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => OrdersPage()),
+                      ),
+                ),
 
-                          _buildMenuCard(
-                            context,
-                            icon: Icons.star_outline,
-                            title: 'Feedbacks',
-                            subtitle: 'Share your experience with us',
-                            onTap:
-                                () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const FeedbacksPage(),
-                                  ),
-                                ),
-                          ),
+                _buildMenuCard(
+                  context,
+                  icon: Icons.star_outline,
+                  title: 'Feedbacks',
+                  subtitle: 'Share your experience with us',
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FeedbacksPage(),
+                        ),
+                      ),
+                ),
+                _buildMenuCard(
+                  context,
+                  icon: Icons.history,
+                  title: 'Contact Us',
+                  subtitle: 'Contact Our Resturant',
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ContactUsPage(),
+                        ),
+                      ),
+                ),
 
-                          // _buildMenuCard(
-                          //   context,
-                          //   icon: Icons.contact_support_outlined,
-                          //   title: 'Contact Us',
-                          //   subtitle: 'Get in touch with support',
-                          //   onTap:
-                          //       () => Navigator.push(
-                          //         context,
-                          //         MaterialPageRoute(
-                          //           builder: (context) => const FeedbacksPage(),
-                          //         ),
-                          //       ),
-                          // ),
+                _buildMenuCard(
+                  context,
+                  icon: Icons.logout,
+                  title: 'Logout',
+                  subtitle: 'Sign out of your account',
+                  onTap: () => _showLogoutDialog(context),
+                  isLogout: true,
+                ),
 
-                          // _buildMenuCard(
-                          //   context,
-                          //   icon: Icons.settings_outlined,
-                          //   title: 'Settings',
-                          //   subtitle: 'App preferences and account settings',
-                          //   onTap: () => Navigator.push(
-                          //     context,
-                          //     MaterialPageRoute(
-                          //       builder: (context) => const SettingsPage(),
-                          //     ),
-                          //   ),
-                          // ),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-                          // _buildMenuCard(
-                          //   context,
-                          //   icon: Icons.help_outline,
-                          //   title: 'Help & Support',
-                          //   subtitle: 'FAQs and customer support',
-                          //   onTap: () => Navigator.push(
-                          //     context,
-                          //     MaterialPageRoute(
-                          //       builder: (context) => const HelpSupportPage(),
-                          //     ),
-                          //   ),
-                          // ),
-                          _buildMenuCard(
-                            context,
-                            icon: Icons.logout,
-                            title: 'Logout',
-                            subtitle: 'Sign out of your account',
-                            onTap: () => _showLogoutDialog(context),
-                            isLogout: true,
-                          ),
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Login illustration
+            Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.person_outline,
+                size: 80,
+                color: Colors.orange,
+              ),
+            ),
 
-                          const SizedBox(height: 20),
-                        ],
+            const SizedBox(height: 30),
+
+            // Title
+            const Text(
+              'Welcome to Turmeric!',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: 15),
+
+            // Subtitle
+            const Text(
+              'Please log in to access your profile and enjoy personalized features.',
+              style: TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+
+            const SizedBox(height: 40),
+
+            // Login Button
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Navigate to login page
+                  GoRouter.of(context).push("/auth/signin");
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.login),
+                    SizedBox(width: 8),
+                    Text(
+                      'Please Log In',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Register option
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "Don't have an account? ",
+                  style: TextStyle(color: Colors.grey),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    // Navigate to register page (adjust route name as needed)
+                    Navigator.pushNamed(context, '/register');
+                  },
+                  child: const Text(
+                    'Sign Up',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -327,8 +439,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 Navigator.of(context).pop(); // Close dialog first
                 try {
                   await fb_auth.FirebaseAuth.instance.signOut();
-                  // Assuming you have a route named '/login' for your login page
-                  Navigator.pushReplacementNamed(context, '/login');
+                  // Update the login status
+                  setState(() {
+                    _isLoggedIn = false;
+                    _currentUser = null;
+                  });
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Logged out successfully!')),
                   );

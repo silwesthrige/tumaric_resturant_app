@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:the_tumeric_papplication/services/promotion_services.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 import 'package:the_tumeric_papplication/models/promotion_model.dart';
@@ -260,7 +261,7 @@ class OfferPageCard extends StatelessWidget {
                     // Claim Offer Button
                     Center(
                       child: GestureDetector(
-                        onTap: isAvailable ? onClaimPressed : null,
+                        onTap: onClaimPressed,
                         child: AnimatedContainer(
                           duration: Duration(milliseconds: 200),
                           width: 120,
@@ -330,7 +331,7 @@ class OfferPageCard extends StatelessWidget {
             ),
 
             // Ripple Effect
-            if (isAvailable)
+            if (isAvailable || !isAlreadyClaimed)
               Positioned.fill(
                 child: Material(
                   color: Colors.transparent,
@@ -359,35 +360,172 @@ class OfferPage extends StatefulWidget {
 class _OfferPageState extends State<OfferPage> {
   final PromotionServices _promotionServices = PromotionServices();
   List<String> _claimedOfferIds = [];
+  bool _isLoadingClaim = false;
 
   @override
   void initState() {
     super.initState();
     _loadClaimedOffers();
+
+    // Listen to auth state changes
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (mounted) {
+        _loadClaimedOffers(); // Reload claimed offers when auth state changes
+      }
+    });
   }
 
   Future<void> _loadClaimedOffers() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        print('Loading claimed offers for user: ${user.uid}');
         final claimedOffersStream = _promotionServices.getUserClaimedOffers(
           user.uid,
         );
-        claimedOffersStream.listen((claimedOffers) {
-          if (mounted) {
-            setState(() {
-              _claimedOfferIds =
-                  claimedOffers
-                      .where((offer) => offer.isActive)
-                      .map((offer) => offer.promoId)
-                      .toList();
-            });
-          }
-        });
+
+        claimedOffersStream.listen(
+          (claimedOffers) {
+            print('Received ${claimedOffers.length} claimed offers');
+            if (mounted) {
+              setState(() {
+                _claimedOfferIds =
+                    claimedOffers.map((offer) => offer.promoId).toList();
+              });
+              print('Updated claimed offer IDs: $_claimedOfferIds');
+            }
+          },
+          onError: (error) {
+            print('Error in claimed offers stream: $error');
+          },
+        );
+      } else {
+        print('No user logged in, clearing claimed offers');
+        if (mounted) {
+          setState(() {
+            _claimedOfferIds.clear();
+          });
+        }
       }
     } catch (e) {
       print('Error loading claimed offers: $e');
     }
+  }
+
+  // Show login/signup dialog when user is not logged in
+  void _showLoginDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.lock_outline, color: kMainOrange),
+              SizedBox(width: 8),
+              Text('Login Required'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.card_giftcard_outlined,
+                size: 64,
+                color: kMainOrange.withOpacity(0.7),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Please login or create an account to claim exclusive offers and discounts!',
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Join thousands of users enjoying amazing deals!',
+                style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      GoRouter.of(context).push("/auth/signup");
+                      // Navigate to signup page
+                      _navigateToAuth(context, isLogin: false);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(color: kMainOrange),
+                      ),
+                    ),
+                    child: Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        color: kMainOrange,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      GoRouter.of(context).push("/auth/signin");
+                      // Navigate to login page
+                      _navigateToAuth(context, isLogin: true);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kMainOrange,
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Login',
+                      style: TextStyle(
+                        color: kmainWhite,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _navigateToAuth(BuildContext context, {required bool isLogin}) {
+    // TODO: Replace with your actual login/signup page navigation
+    // Navigator.pushNamed(context, isLogin ? '/login' : '/signup');
+
+    // For now, show a placeholder message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          isLogin ? 'Navigate to Login Page' : 'Navigate to Sign Up Page',
+        ),
+        backgroundColor: kMainOrange,
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -406,6 +544,7 @@ class _OfferPageState extends State<OfferPage> {
           ),
         ),
         centerTitle: true,
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: Container(
@@ -584,10 +723,7 @@ class _OfferPageState extends State<OfferPage> {
                                   promotion: promo,
                                   isAlreadyClaimed: isAlreadyClaimed,
                                   onClaimPressed:
-                                      isAlreadyClaimed
-                                          ? null
-                                          : () =>
-                                              _handleClaimOffer(context, promo),
+                                      () => _handleClaimOffer(context, promo),
                                 );
                               },
                             ),
@@ -702,10 +838,48 @@ class _OfferPageState extends State<OfferPage> {
   }
 
   void _handleClaimOffer(BuildContext context, PromotionModel promotion) async {
-    // Check if user is authenticated
+    // Check if user is authenticated first
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar(context, 'Please login to claim offers', Colors.red);
+      _showLoginDialog(context);
+      return;
+    }
+
+    // Prevent multiple simultaneous claims
+    if (_isLoadingClaim) {
+      return;
+    }
+
+    // Check if already claimed
+    if (_claimedOfferIds.contains(promotion.promoId)) {
+      _showSnackBar(
+        context,
+        'You have already claimed this offer!',
+        Colors.orange,
+      );
+      return;
+    }
+
+    // Double-check if user has claimed this offer from database
+    try {
+      bool hasAlreadyClaimed = await _promotionServices.hasUserClaimedOffer(
+        user.uid,
+        promotion.promoId,
+      );
+      if (hasAlreadyClaimed) {
+        _showSnackBar(
+          context,
+          'You have already claimed this offer!',
+          Colors.orange,
+        );
+        // Update local state
+        setState(() {
+          _claimedOfferIds.add(promotion.promoId);
+        });
+        return;
+      }
+    } catch (e) {
+      _showSnackBar(context, 'Error checking offer status', Colors.red);
       return;
     }
 
@@ -795,10 +969,13 @@ class _OfferPageState extends State<OfferPage> {
               child: Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _processOfferClaim(context, promotion);
-              },
+              onPressed:
+                  _isLoadingClaim
+                      ? null
+                      : () {
+                        Navigator.of(context).pop();
+                        _processOfferClaim(context, promotion);
+                      },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kMainOrange,
                 shape: RoundedRectangleBorder(
@@ -817,46 +994,68 @@ class _OfferPageState extends State<OfferPage> {
     BuildContext context,
     PromotionModel promotion,
   ) async {
-    try {
-      // Show loading dialog
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder:
-            (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              content: Container(
-                padding: EdgeInsets.all(20),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(kMainOrange),
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Claiming your offer...',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
+    if (_isLoadingClaim) return; // Prevent double claims
+
+    setState(() {
+      _isLoadingClaim = true;
+    });
+
+    // Show loading dialog
+    bool isLoadingDialogShown = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder:
+          (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            content: Container(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(kMainOrange),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    'Claiming your offer...',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ],
               ),
             ),
+          ),
+    ).then((_) {
+      isLoadingDialogShown = false;
+    });
+
+    try {
+      // Final check before claiming
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        throw Exception('Please login to claim offers');
+      }
+
+      // Double-check if user has already claimed
+      bool hasAlreadyClaimed = await _promotionServices.hasUserClaimedOffer(
+        user.uid,
+        promotion.promoId,
       );
+      if (hasAlreadyClaimed) {
+        throw Exception('You have already claimed this offer');
+      }
 
       // Claim the offer using PromotionServices
       ClaimedOffer? claimedOffer = await _promotionServices.claimOffer(
         promotion,
       );
 
-      // Close loading dialog first
-      if (Navigator.canPop(context)) {
+      // Close loading dialog if still showing
+      if (isLoadingDialogShown && Navigator.canPop(context)) {
         Navigator.of(context).pop();
+        isLoadingDialogShown = false;
       }
 
       if (claimedOffer != null) {
@@ -868,20 +1067,29 @@ class _OfferPageState extends State<OfferPage> {
         // Show success dialog
         _showSuccessDialog(context, claimedOffer);
       } else {
-        throw Exception('Failed to claim offer');
+        throw Exception('Failed to claim offer. Please try again.');
       }
     } catch (e) {
       // Make sure to close loading dialog
-      if (Navigator.canPop(context)) {
+      if (isLoadingDialogShown && Navigator.canPop(context)) {
         Navigator.of(context).pop();
+        isLoadingDialogShown = false;
       }
 
       // Show error message
-      _showSnackBar(
-        context,
-        e.toString().replaceAll('Exception: ', ''),
-        Colors.red,
-      );
+      String errorMessage = e.toString();
+      if (errorMessage.contains('Exception:')) {
+        errorMessage = errorMessage.replaceAll('Exception: ', '');
+      }
+
+      _showSnackBar(context, errorMessage, Colors.red);
+    } finally {
+      // Reset loading state
+      if (mounted) {
+        setState(() {
+          _isLoadingClaim = false;
+        });
+      }
     }
   }
 
@@ -985,7 +1193,7 @@ class _OfferPageState extends State<OfferPage> {
   void _showMyOffersDialog() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showSnackBar(context, 'Please login to view your offers', Colors.red);
+      _showLoginDialog(context);
       return;
     }
 

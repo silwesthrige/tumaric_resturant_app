@@ -1508,6 +1508,10 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
                       ),
                     ),
                   );
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomePage()),
+                  );
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Center(

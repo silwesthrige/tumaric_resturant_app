@@ -36,19 +36,22 @@ class _HomePageState extends State<HomePage> {
           child: BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             currentIndex: myCurrentIndex,
-
-            backgroundColor: kmainGreen,
-            selectedItemColor: kMainOrange,
-            unselectedItemColor: kmainWhite,
+            backgroundColor: Colors.white, // Modern clean background
+            selectedItemColor: Color(
+              0xFFF4A300,
+            ), // Turmeric orange for active items
+            unselectedItemColor:
+                Colors.grey.shade500, // Soft gray for inactive icons
             selectedFontSize: 12,
             showSelectedLabels: true,
             showUnselectedLabels: false,
+            elevation: 8, // Adds slight shadow for depth
             onTap: (index) {
               setState(() {
                 myCurrentIndex = index;
               });
             },
-            items: [
+            items: const [
               BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
               BottomNavigationBarItem(
                 icon: Icon(Icons.shopping_cart_rounded),
@@ -56,7 +59,7 @@ class _HomePageState extends State<HomePage> {
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.local_fire_department_rounded),
-                label: "offers",
+                label: "Offers",
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person),

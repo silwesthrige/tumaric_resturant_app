@@ -1,11 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
-import 'package:the_tumeric_papplication/pages/home_page.dart';
-import 'package:the_tumeric_papplication/pages/sign_in_page.dart';
-import 'package:the_tumeric_papplication/screens/aurthantication/wrapper.dart';
+import 'package:the_tumeric_papplication/pages/router/router.dart';
+
 import 'package:the_tumeric_papplication/services/auth.dart';
 
 void main() async {
@@ -23,11 +23,23 @@ class MyApp extends StatelessWidget {
     return StreamProvider<UserModel?>.value(
       initialData: UserModel(uID: ""),
       value: AuthServices().user,
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(fontFamily: GoogleFonts.poppins().fontFamily),
-        title: "The Tumaric",
-        home: Wrapper(),
+      child: Consumer<UserModel?>(
+        builder: (context, user, child) {
+          // Create router with access to user state
+          final router = AppRouter.createRouter();
+
+          return MaterialApp.router(
+            routerConfig: router,
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              fontFamily: GoogleFonts.poppins().fontFamily,
+              // Add some additional theme customizations
+              primarySwatch: Colors.orange,
+              visualDensity: VisualDensity.adaptivePlatformDensity,
+            ),
+            title: "The Turmeric",
+          );
+        },
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
@@ -33,7 +34,11 @@ class _CartPageState extends State<CartPage> {
   String _userAddress = "";
   bool refresh = false;
 
-  // Offer-related variables
+  // Authentication state
+  User? _currentUser;
+  bool _isCheckingAuth = true;
+
+  // Offer-related variables - FIXED
   ClaimedOffer? _selectedOffer;
   List<ClaimedOffer> _availableOffers = [];
   double _discountAmount = 0.0;
@@ -42,52 +47,207 @@ class _CartPageState extends State<CartPage> {
   @override
   void initState() {
     super.initState();
-    _loadCartItems();
-    _loadUserAddress();
-    _loadAvailableOffers();
+    _checkAuthenticationState();
   }
 
-  // Load user's available offers
+  // Check authentication state and load data accordingly
+  Future<void> _checkAuthenticationState() async {
+    setState(() {
+      _isCheckingAuth = true;
+    });
+
+    // Listen to auth state changes
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      if (mounted) {
+        setState(() {
+          _currentUser = user;
+          _isCheckingAuth = false;
+        });
+
+        if (user != null) {
+          // User is logged in, load cart and other data
+          _loadCartItems();
+          _loadUserAddress();
+          _loadAvailableOffers();
+        } else {
+          // User is not logged in, reset everything
+          _resetCartState();
+        }
+      }
+    });
+  }
+
+  // Reset cart state for non-authenticated users
+  void _resetCartState() {
+    setState(() {
+      cartItems = [];
+      itemQuantities = {};
+      _availableOffers = [];
+      _selectedOffer = null;
+      _discountAmount = 0.0;
+      _userAddress = "";
+      _addressController.clear();
+      isLoading = false;
+    });
+  }
+
+  // Show sign-in dialog
+  void _showSignInDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: kMainOrange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(Icons.person_outline, color: kMainOrange, size: 24),
+              ),
+              SizedBox(width: 12),
+              Text(
+                'Sign In Required',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.shopping_cart_outlined,
+                size: 60,
+                color: Colors.grey[400],
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Please sign in to view your cart and place orders',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Navigate to sign in page
+                _navigateToSignIn();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kMainOrange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text('Sign In', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Navigate to sign in page (replace with your actual sign in route)
+  void _navigateToSignIn() {
+    GoRouter.of(context).push("/auth/signin");
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Navigate to Sign In page'),
+        backgroundColor: kMainOrange,
+      ),
+    );
+  }
+
+  // Load user's available offers - FIXED TO MATCH OFFER PAGE
   Future<void> _loadAvailableOffers() async {
+    if (_currentUser == null) return;
+
     try {
       setState(() {
         _isLoadingOffers = true;
       });
 
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final offersStream = _promotionServices.getUserClaimedOffers(user.uid);
-        offersStream.listen((offers) {
-          if (mounted) {
-            final activeOffers =
-                offers
-                    .where(
-                      (offer) =>
-                          offer.isActive && !offer.isUsed && !offer.isExpired,
-                    )
-                    .toList();
+      // Listen to real-time claimed offers like in the offer page
+      _promotionServices.getUserClaimedOffers(_currentUser!.uid).listen((
+        claimedOffers,
+      ) {
+        if (mounted) {
+          // Filter for active, unused, and non-expired offers
+          final activeOffers =
+              claimedOffers
+                  .where(
+                    (offer) =>
+                        offer.isActive &&
+                        !offer.isUsed &&
+                        !offer.isExpired &&
+                        offer.status == 'active',
+                  )
+                  .toList();
 
+          print('Loaded ${activeOffers.length} available offers for cart');
+
+          setState(() {
+            _availableOffers = activeOffers;
+            _isLoadingOffers = false;
+          });
+
+          // If selected offer is no longer available, clear it
+          if (_selectedOffer != null &&
+              !activeOffers.any((offer) => offer.id == _selectedOffer!.id)) {
             setState(() {
-              _availableOffers = activeOffers;
-              _isLoadingOffers = false;
+              _selectedOffer = null;
+              _discountAmount = 0.0;
             });
+          } else if (_selectedOffer != null) {
+            // Recalculate discount
+            _calculateDiscount();
           }
-        });
-      }
+        }
+      });
     } catch (e) {
       print('Error loading available offers: $e');
-      setState(() {
-        _isLoadingOffers = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoadingOffers = false;
+          _availableOffers = [];
+        });
+      }
     }
   }
 
-  // Calculate discount based on selected offer
+  // Calculate discount based on selected offer - FIXED
   void _calculateDiscount() {
-    if (_selectedOffer != null) {
+    if (_selectedOffer != null && cartItems.isNotEmpty) {
+      double discount = 0.0;
+
+      if (_selectedOffer!.promoType.toLowerCase() == 'percentage') {
+        discount = totalPrice * (_selectedOffer!.discountValue / 100);
+      } else {
+        // Fixed amount discount
+        discount =
+            _selectedOffer!.discountValue > totalPrice
+                ? totalPrice
+                : _selectedOffer!.discountValue;
+      }
+
       setState(() {
-        _discountAmount = _selectedOffer!.calculateDiscount(totalPrice);
+        _discountAmount = discount;
       });
+
+      print(
+        'Calculated discount: \$${discount.toStringAsFixed(2)} for offer: ${_selectedOffer!.discountText}',
+      );
     } else {
       setState(() {
         _discountAmount = 0.0;
@@ -95,8 +255,13 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
-  // Show offers selection dialog
+  // Show offers selection dialog - ENHANCED TO MATCH OFFER PAGE STYLE
   Future<void> _showOffersDialog() async {
+    if (_currentUser == null) {
+      _showSignInDialog();
+      return;
+    }
+
     if (_availableOffers.isEmpty) {
       _showInfoDialog(
         'No Offers Available',
@@ -155,7 +320,18 @@ class _CartPageState extends State<CartPage> {
                         itemCount: _availableOffers.length,
                         itemBuilder: (context, index) {
                           final offer = _availableOffers[index];
-                          final discount = offer.calculateDiscount(totalPrice);
+
+                          // Calculate discount for this offer
+                          double discount = 0.0;
+                          if (offer.promoType.toLowerCase() == 'percentage') {
+                            discount = totalPrice * (offer.discountValue / 100);
+                          } else {
+                            discount =
+                                offer.discountValue > totalPrice
+                                    ? totalPrice
+                                    : offer.discountValue;
+                          }
+
                           final isSelected = _selectedOffer?.id == offer.id;
 
                           return Container(
@@ -204,7 +380,13 @@ class _CartPageState extends State<CartPage> {
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text('Save \$${discount.toStringAsFixed(2)}'),
+                                  Text(
+                                    'Save \$${discount.toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green[600],
+                                    ),
+                                  ),
                                   Text(
                                     'Expires in ${offer.daysUntilExpiry} days',
                                     style: TextStyle(
@@ -299,7 +481,7 @@ class _CartPageState extends State<CartPage> {
               children: [
                 Icon(icon, color: kMainOrange),
                 SizedBox(width: 8),
-                Text(title),
+                Text(title, style: TextStyle(fontSize: 20)),
               ],
             ),
             content: Text(message),
@@ -314,22 +496,21 @@ class _CartPageState extends State<CartPage> {
   }
 
   Future<void> _loadUserAddress() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
+    if (_currentUser == null) return;
 
-        if (userDoc.exists) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          setState(() {
-            _userAddress = userData['address'] ?? '';
-            _addressController.text = _userAddress;
-          });
-        }
+    try {
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(_currentUser!.uid)
+              .get();
+
+      if (userDoc.exists && mounted) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        setState(() {
+          _userAddress = userData['address'] ?? '';
+          _addressController.text = _userAddress;
+        });
       }
     } catch (e) {
       print('Error loading user address: $e');
@@ -338,6 +519,11 @@ class _CartPageState extends State<CartPage> {
 
   // Show address confirmation dialog
   Future<void> _showAddressConfirmationDialog() async {
+    if (_currentUser == null) {
+      _showSignInDialog();
+      return;
+    }
+
     return showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -479,7 +665,7 @@ class _CartPageState extends State<CartPage> {
 
   // Process the order and save to Firebase
   Future<void> _processOrder() async {
-    if (_isProcessingOrder) return;
+    if (_isProcessingOrder || _currentUser == null) return;
 
     setState(() {
       _isProcessingOrder = true;
@@ -531,19 +717,6 @@ class _CartPageState extends State<CartPage> {
             };
           }).toList();
 
-      // Create order data with offer information
-      Map<String, dynamic> orderData = {
-        'items': orderItems,
-        'deliveryAddress': _addressController.text.trim(),
-        'status': 'pending',
-        'subtotal': totalPrice,
-        'tax': tax,
-        'deliveryFee': deliveryFee,
-        'discountAmount': _discountAmount,
-        'finalTotal': finalTotal.toStringAsFixed(2),
-        'appliedOffer': _selectedOffer?.toJson(),
-      };
-
       // Create order using OrderService
       String? orderId = await _orderService.createOrder(
         total: finalTotal,
@@ -554,7 +727,7 @@ class _CartPageState extends State<CartPage> {
 
       // If an offer was applied, mark it as used
       if (_selectedOffer != null && orderId != null) {
-        await _promotionServices.useClaimedOffer(_selectedOffer!.id);
+        await _promotionServices.useClaimedOffer(_selectedOffer!.id, orderId);
       }
 
       // Save address to user profile for future use
@@ -587,9 +760,10 @@ class _CartPageState extends State<CartPage> {
 
   // Clear cart after successful order
   Future<void> _clearCartAfterOrder() async {
+    if (_currentUser == null) return;
+
     try {
-      final String uid = FirebaseAuth.instance.currentUser!.uid;
-      await _cartService.clearCart(context, uid);
+      await _cartService.clearCart(context, _currentUser!.uid);
 
       setState(() {
         cartItems.clear();
@@ -605,14 +779,16 @@ class _CartPageState extends State<CartPage> {
 
   // Save user address to Firestore
   Future<void> _saveUserAddress(String address) async {
+    if (_currentUser == null) return;
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'address': address,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-      }
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_currentUser!.uid)
+          .set({
+            'address': address,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
     } catch (e) {
       print('Error saving address: $e');
     }
@@ -764,12 +940,19 @@ class _CartPageState extends State<CartPage> {
 
   // Fixed: Load cart items using the existing CartService
   Future<void> _loadCartItems() async {
+    if (_currentUser == null) return;
+
     try {
-      final String uid = FirebaseAuth.instance.currentUser!.uid;
+      setState(() {
+        isLoading = true;
+      });
 
       // Get user document to retrieve cart items with quantities
       DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(_currentUser!.uid)
+              .get();
 
       if (!userDoc.exists) {
         setState(() {
@@ -852,18 +1035,22 @@ class _CartPageState extends State<CartPage> {
         isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error loading cart items"),
-          backgroundColor: Colors.red[400],
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Error loading cart items"),
+            backgroundColor: Colors.red[400],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
   // Remove item with proper type handling
   Future<void> _removeItem(int index) async {
+    if (_currentUser == null) return;
+
     try {
       FoodDetailModel item = cartItems[index];
       String foodId = item.foodId ?? '';
@@ -917,9 +1104,9 @@ class _CartPageState extends State<CartPage> {
   }
 
   Future<void> _clearCart() async {
-    try {
-      final String uid = FirebaseAuth.instance.currentUser!.uid;
+    if (_currentUser == null) return;
 
+    try {
       bool? confirmed = await showDialog<bool>(
         context: context,
         builder:
@@ -950,7 +1137,7 @@ class _CartPageState extends State<CartPage> {
           _discountAmount = 0.0;
         });
 
-        await _cartService.clearCart(context, uid);
+        await _cartService.clearCart(context, _currentUser!.uid);
       }
     } catch (e) {
       print("Error clearing cart: $e");
@@ -979,6 +1166,97 @@ class _CartPageState extends State<CartPage> {
     return totalPrice + tax + deliveryFee - _discountAmount;
   }
 
+  // Build sign-in prompt widget
+  Widget _buildSignInPrompt() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: kMainOrange.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.person_outline, size: 80, color: kMainOrange),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            "Sign In Required",
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: kmainBlack,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Text(
+              "Please sign in to view your cart, apply offers, and place orders",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[600],
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              OutlinedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => HomePage()),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: kMainOrange),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  "Browse Menu",
+                  style: TextStyle(
+                    color: kMainOrange,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              ElevatedButton(
+                onPressed: _navigateToSignIn,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kMainOrange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: Text(
+                  "Sign In",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -995,8 +1273,9 @@ class _CartPageState extends State<CartPage> {
           ),
         ),
         centerTitle: true,
+        automaticallyImplyLeading: false,
         actions: [
-          if (cartItems.isNotEmpty)
+          if (_currentUser != null && cartItems.isNotEmpty)
             IconButton(
               icon: Container(
                 padding: const EdgeInsets.all(8),
@@ -1031,7 +1310,15 @@ class _CartPageState extends State<CartPage> {
           ),
         ),
         child:
-            isLoading
+            _isCheckingAuth
+                ? Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(kMainOrange),
+                  ),
+                )
+                : _currentUser == null
+                ? _buildSignInPrompt()
+                : isLoading
                 ? Center(
                   child: CircularProgressIndicator(
                     valueColor: AlwaysStoppedAnimation<Color>(kMainOrange),
@@ -1129,7 +1416,7 @@ class _CartPageState extends State<CartPage> {
                       ),
                     ),
 
-                    // Bottom checkout section
+                    // Bottom checkout section with offers ONLY for logged in users with cart items
                     Container(
                       margin: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1148,170 +1435,188 @@ class _CartPageState extends State<CartPage> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Offers Section
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: kMainOrange.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: kMainOrange.withOpacity(0.2),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.local_offer,
-                                        color: kMainOrange,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        _selectedOffer != null
-                                            ? 'Offer Applied'
-                                            : 'Available Offers',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: kMainOrange,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      if (_availableOffers.isNotEmpty)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: kMainOrange,
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '${_availableOffers.length}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                    ],
+                            // Offers Section - Only show if user is logged in
+                            if (_currentUser != null) ...[
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: kMainOrange.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: kMainOrange.withOpacity(0.2),
                                   ),
-                                  const SizedBox(height: 8),
-                                  if (_selectedOffer != null) ...[
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green[50],
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: Colors.green[200]!,
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.local_offer,
+                                          color: kMainOrange,
+                                          size: 20,
                                         ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.check_circle,
-                                            color: Colors.green[600],
-                                            size: 20,
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _selectedOffer != null
+                                              ? 'Offer Applied'
+                                              : 'Available Offers',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: kMainOrange,
                                           ),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  _selectedOffer!.discountText,
-                                                  style: TextStyle(
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Colors.green[600],
+                                        ),
+                                        const Spacer(),
+                                        if (_isLoadingOffers)
+                                          SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    kMainOrange,
                                                   ),
-                                                ),
-                                                Text(
-                                                  'You save ${_discountAmount.toStringAsFixed(2)}',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: Colors.green[600],
-                                                  ),
-                                                ),
-                                              ],
                                             ),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                _selectedOffer = null;
-                                                _calculateDiscount();
-                                              });
-                                            },
+                                          )
+                                        else if (_availableOffers.isNotEmpty)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: kMainOrange,
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
                                             child: Text(
-                                              'Remove',
-                                              style: TextStyle(
-                                                color: Colors.red[600],
+                                              '${_availableOffers.length}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
                                                 fontSize: 12,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ),
-                                        ],
-                                      ),
+                                      ],
                                     ),
-                                  ] else ...[
-                                    GestureDetector(
-                                      onTap: _showOffersDialog,
-                                      child: Container(
+                                    const SizedBox(height: 8),
+                                    if (_selectedOffer != null) ...[
+                                      Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
+                                          color: Colors.green[50],
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
                                           border: Border.all(
-                                            color: kMainOrange.withOpacity(0.3),
+                                            color: Colors.green[200]!,
                                           ),
                                         ),
                                         child: Row(
                                           children: [
                                             Icon(
-                                              Icons.add_circle_outline,
-                                              color: kMainOrange,
+                                              Icons.check_circle,
+                                              color: Colors.green[600],
                                               size: 20,
                                             ),
                                             const SizedBox(width: 8),
                                             Expanded(
-                                              child: Text(
-                                                _availableOffers.isEmpty
-                                                    ? 'No offers available'
-                                                    : 'Tap to select an offer',
-                                                style: TextStyle(
-                                                  color:
-                                                      _availableOffers.isEmpty
-                                                          ? Colors.grey[600]
-                                                          : kMainOrange,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    _selectedOffer!
+                                                        .discountText,
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: Colors.green[600],
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'You save \$${_discountAmount.toStringAsFixed(2)}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.green[600],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                            Icon(
-                                              Icons.arrow_forward_ios,
-                                              color: kMainOrange,
-                                              size: 16,
+                                            TextButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _selectedOffer = null;
+                                                  _calculateDiscount();
+                                                });
+                                              },
+                                              child: Text(
+                                                'Remove',
+                                                style: TextStyle(
+                                                  color: Colors.red[600],
+                                                  fontSize: 12,
+                                                ),
+                                              ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    ),
+                                    ] else ...[
+                                      GestureDetector(
+                                        onTap: _showOffersDialog,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                            border: Border.all(
+                                              color: kMainOrange.withOpacity(
+                                                0.3,
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                Icons.add_circle_outline,
+                                                color: kMainOrange,
+                                                size: 20,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  _availableOffers.isEmpty
+                                                      ? 'No offers available - Visit offers page to claim!'
+                                                      : 'Tap to select an offer and save money',
+                                                  style: TextStyle(
+                                                    color:
+                                                        _availableOffers.isEmpty
+                                                            ? Colors.grey[600]
+                                                            : kMainOrange,
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ),
+                                              Icon(
+                                                Icons.arrow_forward_ios,
+                                                color: kMainOrange,
+                                                size: 16,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
-
-                            const SizedBox(height: 20),
+                              const SizedBox(height: 20),
+                            ],
 
                             // Price breakdown
                             Row(
@@ -1325,7 +1630,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ),
                                 Text(
-                                  "${totalPrice.toStringAsFixed(2)}",
+                                  "\$${totalPrice.toStringAsFixed(2)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1347,7 +1652,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ),
                                 Text(
-                                  "${tax.toStringAsFixed(2)}",
+                                  "\$${tax.toStringAsFixed(2)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1369,7 +1674,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ),
                                 Text(
-                                  "${deliveryFee.toStringAsFixed(2)}",
+                                  "\$${deliveryFee.toStringAsFixed(2)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1394,7 +1699,7 @@ class _CartPageState extends State<CartPage> {
                                     ),
                                   ),
                                   Text(
-                                    "${_discountAmount.toStringAsFixed(2)}",
+                                    "-\$${_discountAmount.toStringAsFixed(2)}",
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -1425,7 +1730,7 @@ class _CartPageState extends State<CartPage> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      "${finalTotal.toStringAsFixed(2)}",
+                                      "\$${finalTotal.toStringAsFixed(2)}",
                                       style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w800,
@@ -1434,7 +1739,7 @@ class _CartPageState extends State<CartPage> {
                                     ),
                                     if (_discountAmount > 0)
                                       Text(
-                                        "You saved ${_discountAmount.toStringAsFixed(2)}!",
+                                        "You saved \$${_discountAmount.toStringAsFixed(2)}!",
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.green[600],
