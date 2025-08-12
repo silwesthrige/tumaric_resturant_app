@@ -12,7 +12,20 @@
           "package_name": "com.example.the_tumeric_papplication"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "808473473804-0d62uf3ufq0viknblfqdctth5c7ied8c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.the_tumeric_papplication",
+            "certificate_hash": "51d6a7e003f6b2d9765ab975445d13e9a4219e68"
+          }
+        },
+        {
+          "client_id": "808473473804-2kn6sj3gtbr7aa7jmdpdijfmi62ealpe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAqZjSgAuSdPP6Ww5YqekR7Ip1bM6j9waI"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "808473473804-2kn6sj3gtbr7aa7jmdpdijfmi62ealpe.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

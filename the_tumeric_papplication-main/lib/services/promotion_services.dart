@@ -363,7 +363,8 @@ class PromotionServices {
   }
 
   // Simple method to test connection
-  Future<bool> testConnection() async {
+  Future<bool> 
+  testConnection() async {
     try {
       await _promoCollection.limit(1).get();
       return true;

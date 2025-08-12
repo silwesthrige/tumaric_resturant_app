@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:the_tumeric_papplication/main.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 import 'package:the_tumeric_papplication/pages/home_page.dart';
 
@@ -167,6 +168,7 @@ class _SignInPageState extends State<SignInPage> {
                                     });
                                   } else {
                                     setState(() {
+                                      context.goToHome();
                                       ScaffoldMessenger.of(
                                         context,
                                       ).showSnackBar(

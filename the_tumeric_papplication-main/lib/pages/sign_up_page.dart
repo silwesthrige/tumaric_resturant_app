@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:the_tumeric_papplication/main.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 import 'package:the_tumeric_papplication/services/auth.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
@@ -300,20 +301,6 @@ class _SignUpPageState extends State<SignUpPage>
                                   ),
                                   onPressed: () async {
                                     if (_formKey.currentState!.validate()) {
-                                      // showDialog(
-                                      //   context: context,
-                                      //   barrierDismissible: false,
-                                      //   builder:
-                                      //       (context) => const Center(
-                                      //         child: CircularProgressIndicator(
-                                      //           valueColor:
-                                      //               AlwaysStoppedAnimation<
-                                      //                 Color
-                                      //               >(Colors.white),
-                                      //         ),
-                                      //       ),
-                                      // );
-
                                       UserModel? result = await _auth
                                           .registerToEmailPassword(
                                             name,
@@ -330,6 +317,8 @@ class _SignUpPageState extends State<SignUpPage>
                                           error =
                                               "Registration failed. Please try again.";
                                         });
+                                      } else {
+                                        context.goToHome();
                                       }
                                       // Navigator.of(context).pop();
                                     }

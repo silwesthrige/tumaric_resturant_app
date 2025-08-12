@@ -1,10 +1,10 @@
 class FoodDetailModel {
-  final String foodName;
-  final String discription;
-  final String shortDisc;
-  final String imageUrl;
-  final double price;
-  final double cookedTime;
+  final String? foodName;
+  final String? discription;
+  final String? shortDisc;
+  final String? imageUrl;
+  final double? price;
+  final double? cookedTime;
   final String? foodId;
   final String? status;
 

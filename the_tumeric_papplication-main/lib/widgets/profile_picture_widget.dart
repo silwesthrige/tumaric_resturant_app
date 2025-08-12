@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 import 'package:the_tumeric_papplication/services/profile_picture_service.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
+import 'package:the_tumeric_papplication/utils/colors.dart';
 
 class ProfilePictureWidget extends StatefulWidget {
   final UserModel? currentUser;
@@ -27,11 +28,14 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
   Future<void> _changeProfilePicture() async {
     try {
       // Show image source selection dialog
-      final ImageSource? source = await _profilePictureService.showImageSourceDialog(context);
+      final ImageSource? source = await _profilePictureService
+          .showImageSourceDialog(context);
       if (source == null) return;
 
       // Pick image
-      final File? imageFile = await _profilePictureService.pickImage(source: source);
+      final File? imageFile = await _profilePictureService.pickImage(
+        source: source,
+      );
       if (imageFile == null) return;
 
       setState(() {
@@ -41,7 +45,7 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
       // Show loading indicator
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Row(
               children: [
                 CircularProgressIndicator(color: Colors.white),
@@ -49,29 +53,35 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
                 Text('Uploading profile picture...'),
               ],
             ),
-            backgroundColor: Colors.orange,
+            backgroundColor: kMainOrange,
             duration: Duration(seconds: 10),
           ),
         );
       }
 
       // Delete old profile picture if exists
-      if (widget.currentUser?.profileImageUrl != null && 
+      if (widget.currentUser?.profileImageUrl != null &&
           widget.currentUser!.profileImageUrl!.isNotEmpty) {
-        await _profilePictureService.deleteProfilePicture(widget.currentUser!.profileImageUrl!);
+        await _profilePictureService.deleteProfilePicture(
+          widget.currentUser!.profileImageUrl!,
+        );
       }
 
       // Upload new image
-      final String? downloadUrl = await _profilePictureService.uploadProfilePicture(imageFile);
+      final String? downloadUrl = await _profilePictureService
+          .uploadProfilePicture(imageFile);
 
       if (downloadUrl != null && widget.currentUser != null) {
         // Update user profile in Firestore
-        await _userServices.updateProfilePicture(widget.currentUser!.uID, downloadUrl);
+        await _userServices.updateProfilePicture(
+          widget.currentUser!.uID,
+          downloadUrl,
+        );
 
         if (mounted) {
           // Hide loading snackbar
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          
+
           // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -101,10 +111,7 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
       if (mounted) {
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -123,19 +130,20 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
         // Profile Image
         CircleAvatar(
           radius: 50,
-          backgroundImage: widget.currentUser?.profileImageUrl != null
-              ? NetworkImage(widget.currentUser!.profileImageUrl!)
-              : const AssetImage('assets/images/profile.jpg') as ImageProvider,
+
+          backgroundImage:
+              widget.currentUser?.profileImageUrl != null
+                  ? NetworkImage(widget.currentUser!.profileImageUrl!)
+                  : const AssetImage('assets/images/profile.jpg')
+                      as ImageProvider,
           backgroundColor: Colors.white,
-          child: widget.currentUser?.profileImageUrl == null
-              ? const Icon(
-                  Icons.person,
-                  size: 50,
-                  color: Colors.grey,
-                )
-              : null,
+
+          child:
+              widget.currentUser?.profileImageUrl == null
+                  ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                  : null,
         ),
-        
+
         // Edit Button
         Positioned(
           bottom: 0,
@@ -151,24 +159,25 @@ class _ProfilePictureWidgetState extends State<ProfilePictureWidget> {
                   BoxShadow(
                     color: Colors.black26,
                     blurRadius: 4,
-                    offset: Offset(0, 2),
+                    offset: Offset(0, 5),
                   ),
                 ],
               ),
-              child: _isUploading
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
+              child:
+                  _isUploading
+                      ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : const Icon(
+                        Icons.camera_alt,
                         color: Colors.white,
-                        strokeWidth: 2,
+                        size: 16,
                       ),
-                    )
-                  : const Icon(
-                      Icons.camera_alt,
-                      color: Colors.white,
-                      size: 16,
-                    ),
             ),
           ),
         ),

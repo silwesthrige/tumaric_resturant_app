@@ -12,3 +12,7 @@ final Color kBrown = Color(0XFF8B5E3C);
 final Color textPrimary = Color(0XFF2D2D2D);
 final Color textSecondary = Color(0xFF6B6B6B);
 final double kPaddingPage = 10;
+
+final Color kMainGold = Color(0xFFF4A300);
+final Color KMainGoldShade = Color(0xFFFFD166);
+

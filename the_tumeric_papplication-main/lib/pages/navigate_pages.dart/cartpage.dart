@@ -7,6 +7,7 @@ import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 import 'package:the_tumeric_papplication/models/promotion_model.dart';
 import 'package:the_tumeric_papplication/pages/home_page.dart';
+import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/services/cart_service.dart';
 import 'package:the_tumeric_papplication/services/order_services.dart';
 import 'package:the_tumeric_papplication/services/promotion_services.dart';
@@ -906,6 +907,39 @@ class _CartPageState extends State<CartPage> {
                   ),
                 ),
               ),
+              SizedBox(height: 15),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.orangeAccent[400]!,
+                      Colors.orangeAccent[600]!,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return OrdersPage();
+                        },
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'View Your Order',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
     );
@@ -1397,10 +1431,10 @@ class _CartPageState extends State<CartPage> {
                             margin: const EdgeInsets.only(bottom: 12),
                             child: CaertAddCard(
                               qty: quantity,
-                              imageUrl: item.imageUrl,
-                              title: item.foodName,
-                              disc: item.shortDisc,
-                              price: item.price,
+                              imageUrl: item.imageUrl!,
+                              title: item.foodName!,
+                              disc: item.shortDisc!,
+                              price: item.price!,
                               onDelete: () {
                                 CartService().removeFromCart(
                                   context,
@@ -1759,7 +1793,7 @@ class _CartPageState extends State<CartPage> {
                               height: 50,
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [kMainOrange, kmainGreen],
+                                  colors: [kMainOrange, kMainOrange],
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                 ),

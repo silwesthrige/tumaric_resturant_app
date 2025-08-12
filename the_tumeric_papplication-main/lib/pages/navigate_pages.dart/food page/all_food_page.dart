@@ -247,8 +247,8 @@ class _AllFoodsPageState extends State<AllFoodsPage>
           // Apply search filter
           final filteredFoods =
               availableFoods.where((food) {
-                return food.foodName.toLowerCase().contains(_searchQuery) ||
-                    food.discription.toLowerCase().contains(_searchQuery);
+                return food.foodName!.toLowerCase().contains(_searchQuery) ||
+                    food.discription!.toLowerCase().contains(_searchQuery);
               }).toList();
 
           if (filteredFoods.isEmpty && _searchQuery.isNotEmpty) {
@@ -326,14 +326,14 @@ class _AllFoodsPageState extends State<AllFoodsPage>
           foodsWithRatings.sort((a, b) {
             final aPrice = (a['food'] as FoodDetailModel).price;
             final bPrice = (b['food'] as FoodDetailModel).price;
-            return aPrice.compareTo(bPrice);
+            return aPrice!.compareTo(bPrice!);
           });
           break;
         case 'price_high':
           foodsWithRatings.sort((a, b) {
             final aPrice = (a['food'] as FoodDetailModel).price;
             final bPrice = (b['food'] as FoodDetailModel).price;
-            return bPrice.compareTo(aPrice);
+            return bPrice!.compareTo(aPrice!);
           });
           break;
         case 'name':
@@ -341,7 +341,7 @@ class _AllFoodsPageState extends State<AllFoodsPage>
           foodsWithRatings.sort((a, b) {
             final aName = (a['food'] as FoodDetailModel).foodName;
             final bName = (b['food'] as FoodDetailModel).foodName;
-            return aName.compareTo(bName);
+            return aName!.compareTo(bName!);
           });
           break;
       }
@@ -400,9 +400,9 @@ class _AllFoodsPageState extends State<AllFoodsPage>
                 ),
                 child: MainFoodCard(
                   food: food,
-                  title: food.foodName,
-                  imageUrl: food.imageUrl,
-                  price: food.price,
+                  title: food.foodName!,
+                  imageUrl: food.imageUrl!,
+                  price: food.price!,
                   ontap: () {
                     Navigator.push(
                       context,
@@ -411,11 +411,11 @@ class _AllFoodsPageState extends State<AllFoodsPage>
                             (context, animation, secondaryAnimation) =>
                                 MainFoodDiscPage(
                                   foodId: food.foodId.toString(),
-                                  title: food.foodName,
-                                  disc: food.discription,
-                                  imageUrl: food.imageUrl,
-                                  price: food.price,
-                                  time: food.cookedTime,
+                                  title: food.foodName!,
+                                  disc: food.discription!,
+                                  imageUrl: food.imageUrl!,
+                                  price: food.price!,
+                                  time: food.cookedTime!,
                                 ),
                         transitionsBuilder: (
                           context,
@@ -479,9 +479,9 @@ class _AllFoodsPageState extends State<AllFoodsPage>
                 ),
                 child: MainFoodCard(
                   food: food,
-                  title: food.foodName,
-                  imageUrl: food.imageUrl,
-                  price: food.price,
+                  title: food.foodName!,
+                  imageUrl: food.imageUrl!,
+                  price: food.price!,
                   ontap: () {
                     Navigator.push(
                       context,
@@ -490,11 +490,11 @@ class _AllFoodsPageState extends State<AllFoodsPage>
                             (context, animation, secondaryAnimation) =>
                                 MainFoodDiscPage(
                                   foodId: food.foodId.toString(),
-                                  title: food.foodName,
-                                  disc: food.discription,
-                                  imageUrl: food.imageUrl,
-                                  price: food.price,
-                                  time: food.cookedTime,
+                                  title: food.foodName!,
+                                  disc: food.discription!,
+                                  imageUrl: food.imageUrl!,
+                                  price: food.price!,
+                                  time: food.cookedTime!,
                                 ),
                         transitionsBuilder: (
                           context,

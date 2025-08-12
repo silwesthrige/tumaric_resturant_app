@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:the_tumeric_papplication/main.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart'; // Adjust path
 import 'package:the_tumeric_papplication/pages/profile_pages/contact_us_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/feedback_page.dart';
@@ -7,6 +8,7 @@ import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/resturant_page.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
+import 'package:the_tumeric_papplication/utils/colors.dart';
 import 'package:the_tumeric_papplication/widgets/profile_page_tabs.dart';
 import 'package:the_tumeric_papplication/widgets/profile_picture_widget.dart'; // Import the profile picture widget
 import 'package:firebase_auth/firebase_auth.dart'
@@ -96,10 +98,11 @@ class _ProfilePageState extends State<ProfilePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Profile'),
+        title: Text('Profile'),
         automaticallyImplyLeading: false,
-        backgroundColor: Colors.orange,
-        foregroundColor: Colors.white,
+
+        backgroundColor: kMainOrange,
+        foregroundColor: kmainWhite,
         elevation: 0,
       ),
       body:
@@ -120,8 +123,16 @@ class _ProfilePageState extends State<ProfilePage> {
           // Profile Header Section
           Container(
             width: double.infinity,
-            decoration: const BoxDecoration(
-              color: Colors.orange,
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  blurRadius: 17,
+                  color: kMainOrange,
+                  offset: Offset(0, 2),
+                  blurStyle: BlurStyle.solid,
+                ),
+              ],
+              color: kMainOrange,
               borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
@@ -270,14 +281,10 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 150,
               height: 150,
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: kMainOrange.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.person_outline,
-                size: 80,
-                color: Colors.orange,
-              ),
+              child: Icon(Icons.person_outline, size: 80, color: kMainOrange),
             ),
 
             const SizedBox(height: 30),
@@ -311,10 +318,10 @@ class _ProfilePageState extends State<ProfilePage> {
               child: ElevatedButton(
                 onPressed: () {
                   // Navigate to login page
-                  GoRouter.of(context).push("/auth/signin");
+                  context.goToSignIn();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: kMainOrange,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -351,7 +358,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 GestureDetector(
                   onTap: () {
                     // Navigate to register page (adjust route name as needed)
-                    Navigator.pushNamed(context, '/register');
+                    GoRouter.of(context).push("/auth/signup");
                   },
                   child: const Text(
                     'Sign Up',
@@ -447,6 +454,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Logged out successfully!')),
                   );
+                  context.goToSignIn();
                 } catch (e) {
                   print("Error during logout: $e");
                   ScaffoldMessenger.of(

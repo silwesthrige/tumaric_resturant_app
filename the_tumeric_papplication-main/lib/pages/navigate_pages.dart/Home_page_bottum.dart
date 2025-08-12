@@ -106,9 +106,9 @@ class _HomePageBottumState extends State<HomePageBottum>
 
     _filteredFoods =
         _allFoods.where((food) {
-          return food.foodName.toLowerCase().contains(query.toLowerCase()) ||
-              food.discription.toLowerCase().contains(query.toLowerCase()) ||
-              food.shortDisc.toLowerCase().contains(query.toLowerCase());
+          return food.foodName!.toLowerCase().contains(query.toLowerCase()) ||
+              food.discription!.toLowerCase().contains(query.toLowerCase()) ||
+              food.shortDisc!.toLowerCase().contains(query.toLowerCase());
         }).toList();
   }
 
@@ -461,9 +461,9 @@ class _HomePageBottumState extends State<HomePageBottum>
                 curve: Curves.easeOutBack,
                 child: MainFoodCard(
                   food: food,
-                  title: food.foodName,
-                  imageUrl: food.imageUrl,
-                  price: food.price,
+                  title: food.foodName!,
+                  imageUrl: food.imageUrl!,
+                  price: food.price!,
                   ontap: () {
                     Navigator.push(
                       context,
@@ -472,11 +472,11 @@ class _HomePageBottumState extends State<HomePageBottum>
                             (context, animation, secondaryAnimation) =>
                                 MainFoodDiscPage(
                                   foodId: food.foodId.toString(),
-                                  title: food.foodName,
-                                  disc: food.discription,
-                                  imageUrl: food.imageUrl,
-                                  price: food.price,
-                                  time: food.cookedTime,
+                                  title: food.foodName!,
+                                  disc: food.discription!,
+                                  imageUrl: food.imageUrl!,
+                                  price: food.price!,
+                                  time: food.cookedTime!,
                                 ),
                         transitionsBuilder: (
                           context,
@@ -737,9 +737,9 @@ class _HomePageBottumState extends State<HomePageBottum>
               // MainFoodCard
               MainFoodCard(
                 food: foodModel,
-                title: foodModel.foodName,
-                imageUrl: foodModel.imageUrl,
-                price: foodModel.price,
+                title: foodModel.foodName!,
+                imageUrl: foodModel.imageUrl!,
+                price: foodModel.price!,
                 ontap: () {
                   Navigator.push(
                     context,
@@ -748,11 +748,11 @@ class _HomePageBottumState extends State<HomePageBottum>
                           (context, animation, secondaryAnimation) =>
                               MainFoodDiscPage(
                                 foodId: foodModel.foodId.toString(),
-                                title: foodModel.foodName,
-                                disc: foodModel.discription,
-                                imageUrl: foodModel.imageUrl,
-                                price: foodModel.price,
-                                time: foodModel.cookedTime,
+                                title: foodModel.foodName!,
+                                disc: foodModel.discription!,
+                                imageUrl: foodModel.imageUrl!,
+                                price: foodModel.price!,
+                                time: foodModel.cookedTime!,
                               ),
                       transitionsBuilder: (
                         context,
@@ -891,9 +891,9 @@ class _HomePageBottumState extends State<HomePageBottum>
                   tag: "food_${food.foodName}_$index",
                   child: MainFoodCard(
                     food: food,
-                    title: food.foodName,
-                    imageUrl: food.imageUrl,
-                    price: food.price,
+                    title: food.foodName!,
+                    imageUrl: food.imageUrl!,
+                    price: food.price!,
                     ontap: () {
                       Navigator.push(
                         context,
@@ -902,11 +902,11 @@ class _HomePageBottumState extends State<HomePageBottum>
                               (context, animation, secondaryAnimation) =>
                                   MainFoodDiscPage(
                                     foodId: food.foodId.toString(),
-                                    title: food.foodName,
-                                    disc: food.discription,
-                                    imageUrl: food.imageUrl,
-                                    price: food.price,
-                                    time: food.cookedTime,
+                                    title: food.foodName!,
+                                    disc: food.discription!,
+                                    imageUrl: food.imageUrl!,
+                                    price: food.price!,
+                                    time: food.cookedTime!,
                                   ),
                           transitionsBuilder: (
                             context,
