@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +25,8 @@ class CartPage extends StatefulWidget {
 }
 
 class _CartPageState extends State<CartPage> {
+  Map<String, dynamic> _cartExpiryInfo = {};
+  Timer? _expiryUpdateTimer;
   // Store cart items with their quantities
   List<FoodDetailModel> cartItems = [];
   Map<String, int> itemQuantities = {};
@@ -50,6 +54,122 @@ class _CartPageState extends State<CartPage> {
   void initState() {
     super.initState();
     _checkAuthenticationState();
+    _startExpiryUpdateTimer();
+  }
+
+  @override
+  void dispose() {
+    _expiryUpdateTimer?.cancel();
+    _cartService.dispose(); // Clean up cart service timer
+    super.dispose();
+  }
+
+  Future<void> _updateCartExpiryInfo() async {
+    if (_currentUser == null) return;
+
+    try {
+      final expiryInfo = await _cartService.getCartExpiryInfo(
+        _currentUser!.uid,
+      );
+
+      if (mounted) {
+        setState(() {
+          _cartExpiryInfo = expiryInfo;
+        });
+
+        // If cart expired and was auto-cleared, refresh the cart
+        if (expiryInfo['hasItems'] == false && cartItems.isNotEmpty) {
+          _loadCartItems();
+        }
+      }
+    } catch (e) {
+      print('Error updating cart expiry info: $e');
+    }
+  }
+
+  void _showCartInfoDialog() {
+    if (_cartExpiryInfo['hasItems'] != true) return;
+
+    final expiryMinutes = _cartExpiryInfo['expiryMinutes'] as int? ?? 30;
+    final totalItems = _cartExpiryInfo['totalItems'] as int? ?? 0;
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Icon(Icons.info_outline, color: kMainOrange),
+                SizedBox(width: 8),
+                Text('Cart Information'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cart Auto-Clear Policy:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 8),
+                Text('• Items are automatically removed after 30 minutes'),
+                Text('• This ensures fresh availability for all customers'),
+                Text('• You can refresh items to reset the timer'),
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[50],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Current Cart Status:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      SizedBox(height: 4),
+                      Text('Total items: $totalItems'),
+                      Text('Time remaining: $expiryMinutes minutes'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('OK'),
+              ),
+              if (expiryMinutes <= 10)
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _refreshCartItems();
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: kMainOrange),
+                  child: Text(
+                    'Refresh Items',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+    );
+  }
+
+  void _startExpiryUpdateTimer() {
+    _expiryUpdateTimer?.cancel();
+    _expiryUpdateTimer = Timer.periodic(Duration(minutes: 1), (timer) {
+      if (_currentUser != null && mounted) {
+        _updateCartExpiryInfo();
+      }
+    });
   }
 
   // Check authentication state and load data accordingly
@@ -665,6 +785,15 @@ class _CartPageState extends State<CartPage> {
     );
   }
 
+  Future<void> _manualCleanup() async {
+    try {
+      await _cartService.manualCleanup(context);
+      await _loadCartItems(); // Refresh cart after cleanup
+    } catch (e) {
+      print('Error in manual cleanup: $e');
+    }
+  }
+
   // Process the order and save to Firebase
   Future<void> _processOrder() async {
     if (_isProcessingOrder || _currentUser == null) return;
@@ -976,14 +1105,16 @@ class _CartPageState extends State<CartPage> {
         isLoading = true;
       });
 
-      // Get user document to retrieve cart items with quantities
-      DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(_currentUser!.uid)
-              .get();
+      // Clean expired items first and get notification
+      await _cartService.cleanExpiredCartItemsWithNotification(
+        context,
+        _currentUser!.uid,
+      );
 
-      if (!userDoc.exists) {
+      // Get updated cart items using the enhanced service
+      final cartItemsData = await _cartService.getCartItems(_currentUser!.uid);
+
+      if (cartItemsData.isEmpty) {
         setState(() {
           cartItems = [];
           itemQuantities = {};
@@ -992,38 +1123,19 @@ class _CartPageState extends State<CartPage> {
         return;
       }
 
-      final userData = userDoc.data() as Map<String, dynamic>;
-      final List<dynamic> cartData = userData['cart'] ?? [];
-
-      if (cartData.isEmpty) {
-        setState(() {
-          cartItems = [];
-          itemQuantities = {};
-          isLoading = false;
-        });
-        return;
-      }
-
-      // Convert cart data to CartItem objects and extract food IDs
+      // Extract food IDs and quantities from CartItem objects
       List<String> foodIds = [];
       Map<String, int> quantities = {};
 
-      for (var item in cartData) {
-        if (item is Map<String, dynamic>) {
-          // New format with CartItem structure
-          final cartItem = CartItem.fromJson(item);
-          foodIds.add(cartItem.foodId);
-          quantities[cartItem.foodId] = cartItem.quantity;
-        } else if (item is String) {
-          // Old format where cart items were just strings (food IDs)
-          foodIds.add(item);
-          quantities[item] = 1;
-        }
+      for (var cartItem in cartItemsData) {
+        foodIds.add(cartItem.foodId);
+        quantities[cartItem.foodId] = cartItem.quantity;
       }
 
-      // Use CartService to load food details from the correct collection
+      // Load food details from Firestore
       List<DocumentSnapshot> foodDocs = await _cartService.getCartFoodDetails(
         foodIds,
+        context: context,
       );
 
       // Convert documents to FoodDetailModel list
@@ -1051,6 +1163,9 @@ class _CartPageState extends State<CartPage> {
         isLoading = false;
       });
 
+      // Update expiry info
+      _updateCartExpiryInfo();
+
       // Calculate discount when cart is loaded
       _calculateDiscount();
 
@@ -1068,6 +1183,152 @@ class _CartPageState extends State<CartPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Error loading cart items"),
+            backgroundColor: Colors.red[400],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildCartExpiryWarning() {
+    if (_cartExpiryInfo['hasItems'] != true) return SizedBox.shrink();
+
+    final expiryMinutes = _cartExpiryInfo['expiryMinutes'] as int? ?? 30;
+    final totalItems = _cartExpiryInfo['totalItems'] as int? ?? 0;
+
+    if (expiryMinutes > 10)
+      return SizedBox.shrink(); // Only show warning when < 10 minutes
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: expiryMinutes <= 5 ? Colors.red[50] : Colors.orange[50],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: expiryMinutes <= 5 ? Colors.red[300]! : Colors.orange[300]!,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.access_time,
+            color: expiryMinutes <= 5 ? Colors.red[600] : Colors.orange[600],
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  expiryMinutes <= 5
+                      ? 'Cart items expiring soon!'
+                      : 'Cart items will expire soon',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color:
+                        expiryMinutes <= 5
+                            ? Colors.red[700]
+                            : Colors.orange[700],
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  '$totalItems item(s) will be removed in $expiryMinutes minute(s)',
+                  style: TextStyle(
+                    color:
+                        expiryMinutes <= 5
+                            ? Colors.red[600]
+                            : Colors.orange[600],
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (expiryMinutes <= 5)
+            TextButton(
+              onPressed: () {
+                // Refresh items by re-adding them (resets timestamp)
+                _refreshCartItems();
+              },
+              child: Text(
+                'Keep Items',
+                style: TextStyle(
+                  color: Colors.red[600],
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Refresh cart items (extend expiry by re-adding)
+  Future<void> _refreshCartItems() async {
+    if (_currentUser == null || cartItems.isEmpty) return;
+
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder:
+            (context) => AlertDialog(
+              content: Row(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 16),
+                  Text('Refreshing cart items...'),
+                ],
+              ),
+            ),
+      );
+
+      // Get current cart items
+      final currentCartItems = await _cartService.getCartItems(
+        _currentUser!.uid,
+      );
+
+      // Clear cart
+      await _cartService.clearCart(context, _currentUser!.uid);
+
+      // Re-add all items (this will reset their timestamps)
+      for (var cartItem in currentCartItems) {
+        await _cartService.addToCart(
+          context,
+          cartItem.foodId,
+          quantity: cartItem.quantity,
+        );
+      }
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // Reload cart
+      await _loadCartItems();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cart items refreshed! New 30-minute timer started.'),
+            backgroundColor: Colors.green[400],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      print('Error refreshing cart items: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh cart items'),
             backgroundColor: Colors.red[400],
             behavior: SnackBarBehavior.floating,
           ),

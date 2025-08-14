@@ -5,17 +5,56 @@ import 'package:firebase_auth/firebase_auth.dart';
 class CartItem {
   final String foodId;
   final int quantity;
+  final DateTime addedAt; // Timestamp when item was added to cart
 
-  CartItem({required this.foodId, required this.quantity});
+  CartItem({required this.foodId, required this.quantity, DateTime? addedAt})
+    : addedAt = addedAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() {
-    return {'foodId': foodId, 'quantity': quantity};
+    return {
+      'foodId': foodId,
+      'quantity': quantity,
+      'addedAt': Timestamp.fromDate(addedAt), // Store as Firestore Timestamp
+    };
   }
 
   factory CartItem.fromJson(Map<String, dynamic> json) {
     return CartItem(
       foodId: json['foodId'] ?? '',
       quantity: json['quantity'] ?? 1,
+      addedAt:
+          json['addedAt'] != null
+              ? (json['addedAt'] as Timestamp).toDate()
+              : DateTime.now(),
+    );
+  }
+
+  // Check if this cart item has expired (30 minutes)
+  bool get isExpired {
+    final now = DateTime.now();
+    final expiryTime = addedAt.add(Duration(minutes: 30));
+    return now.isAfter(expiryTime);
+  }
+
+  // Get remaining time until expiry
+  Duration get timeUntilExpiry {
+    final now = DateTime.now();
+    final expiryTime = addedAt.add(Duration(minutes: 30));
+    return expiryTime.difference(now);
+  }
+
+  // Get minutes remaining until expiry
+  int get minutesUntilExpiry {
+    final remaining = timeUntilExpiry;
+    return remaining.inMinutes.clamp(0, 30);
+  }
+
+  // Create a copy with updated quantity
+  CartItem copyWith({String? foodId, int? quantity, DateTime? addedAt}) {
+    return CartItem(
+      foodId: foodId ?? this.foodId,
+      quantity: quantity ?? this.quantity,
+      addedAt: addedAt ?? this.addedAt,
     );
   }
 }
