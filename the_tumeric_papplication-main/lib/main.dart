@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:the_tumeric_papplication/firebase_options.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 import 'package:the_tumeric_papplication/notifications/message_opener.dart';
+import 'package:the_tumeric_papplication/notifications/notification_page.dart';
 import 'package:the_tumeric_papplication/notifications/notification_services.dart';
 import 'package:the_tumeric_papplication/notifications/push_notifications.dart';
 import 'package:the_tumeric_papplication/pages/home_page.dart';
@@ -13,6 +14,7 @@ import 'package:the_tumeric_papplication/pages/navigate_pages.dart/offer_page.da
 import 'package:the_tumeric_papplication/pages/sign_in_page.dart';
 import 'package:the_tumeric_papplication/pages/sign_up_page.dart';
 import 'package:the_tumeric_papplication/screens/aurthantication/wrapper.dart';
+import 'package:the_tumeric_papplication/services/order_services.dart';
 
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:the_tumeric_papplication/services/auth.dart';
@@ -117,7 +119,7 @@ class _MyAppState extends State<MyApp> {
           '/offer-page': (context) => OfferPage(),
           '/wrapper': (context) => const Wrapper(),
           '/message': (context) => MessageOpener(),
-          // Add more routes as needed
+          '/notifications': (context) => const NotificationsPage(),
         },
         // Handle unknown routes
         onUnknownRoute: (settings) {
@@ -174,6 +176,7 @@ extension NavigationExtension on BuildContext {
       Navigator.of(this).pushNamedAndRemoveUntil('/wrapper', (route) => false);
 
   void goToOfferPage() => Navigator.of(this).pushNamed('/offer-page');
+  void goToNotifications() => Navigator.of(this).pushNamed('/notifications');
 
   // Add more navigation methods as needed
 }

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:badges/badges.dart' as badges;
 import 'package:the_tumeric_papplication/models/catogary_model.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
-
+import 'package:the_tumeric_papplication/notifications/notification_page.dart';
 import 'package:the_tumeric_papplication/pages/main_food_disc_page.dart';
-
 import 'package:the_tumeric_papplication/pages/navigate_pages.dart/food%20page/all_food_page.dart';
+
 import 'package:the_tumeric_papplication/reuse_component/pramotion_card.dart';
 import 'package:the_tumeric_papplication/services/catogary_service.dart';
 import 'package:the_tumeric_papplication/services/food_services.dart';
+import 'package:the_tumeric_papplication/services/order_services.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart';
 import 'package:the_tumeric_papplication/services/rating_service.dart';
+import 'package:the_tumeric_papplication/services/notification_service.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
-
 import 'package:the_tumeric_papplication/widgets/main_food_card.dart';
 import 'package:the_tumeric_papplication/widgets/mini_card_list_view.dart';
 import 'package:the_tumeric_papplication/widgets/search_bar.dart';
@@ -31,6 +33,9 @@ class _HomePageBottumState extends State<HomePageBottum>
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
 
+  // Services
+  final NotificationService _notificationService = NotificationService();
+
   // Search functionality
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -46,6 +51,15 @@ class _HomePageBottumState extends State<HomePageBottum>
     fetchUserData();
     _setupSearchListener();
     _loadAllFoods();
+    _initializeNotificationService();
+    void _checkMissingNotifications() async {
+      final orderService = OrderService();
+      await orderService.checkAndCreateMissingNotifications();
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkMissingNotifications();
+    });
 
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -70,6 +84,11 @@ class _HomePageBottumState extends State<HomePageBottum>
     // Start animations
     _fadeController.forward();
     _slideController.forward();
+  }
+
+  void _initializeNotificationService() async {
+    // Store user FCM token for notifications
+    await _notificationService.storeUserToken();
   }
 
   void _setupSearchListener() {
@@ -271,15 +290,55 @@ class _HomePageBottumState extends State<HomePageBottum>
         child: const Icon(Icons.menu, color: Colors.white),
       ),
       actions: [
+        // Notification icon with badge
         Container(
           margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-            onPressed: () {},
+          child: StreamBuilder<int>(
+            stream: _notificationService.getUnreadNotificationCount(),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+
+              return badges.Badge(
+                badgeContent: Text(
+                  unreadCount > 99 ? '99+' : unreadCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                showBadge: unreadCount > 0,
+                badgeStyle: badges.BadgeStyle(
+                  badgeColor: Colors.red,
+                  padding: EdgeInsets.all(unreadCount > 9 ? 4 : 6),
+                  borderRadius: BorderRadius.circular(10),
+                  elevation: 4,
+                ),
+                badgeAnimation: const badges.BadgeAnimation.slide(
+                  animationDuration: Duration(milliseconds: 300),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.notifications_outlined,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const NotificationsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ],

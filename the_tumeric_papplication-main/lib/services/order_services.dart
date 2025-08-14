@@ -1,13 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:the_tumeric_papplication/models/order_model.dart';
+import 'package:the_tumeric_papplication/notifications/notification_services.dart';
+import 'package:the_tumeric_papplication/services/notification_service.dart';
 
 class OrderService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _ordersCollection = 'orders';
+  final NotificationService _notificationService = NotificationService();
 
-  // Create a new order
+  // Create a new order (with automatic notification)
   Future<String?> createOrder({
     required double total,
     required List<Map<String, dynamic>> items,
@@ -52,13 +55,29 @@ class OrderService {
         'deliveryAddress': deliveryAddress.trim(),
         'createdAt': DateTime.now().toIso8601String(),
         'updatedAt': DateTime.now().toIso8601String(),
-        'total' : total.toDouble(),
+        'total': total.toDouble(),
       };
 
       DocumentReference docRef = await _firestore
           .collection(_ordersCollection)
           .add(orderData);
       await docRef.update({'orderId': docRef.id});
+
+      // Send order creation notification
+      await _notificationService.createNotification(
+        userId: currentUser.uid,
+        title: '🎉 Order Placed Successfully!',
+        message:
+            'Your order #${docRef.id.substring(0, 8)} worth ₹${total.toStringAsFixed(2)} has been placed. We\'ll notify you when it\'s confirmed.',
+        type: 'order_status',
+        orderId: docRef.id,
+        orderStatus: status,
+        additionalData: {
+          'orderTotal': total.toString(),
+          'itemCount': items.length,
+        },
+      );
+
       return docRef.id;
     } catch (e) {
       print('Error creating order: $e');
@@ -78,6 +97,41 @@ class OrderService {
       return null;
     } catch (e) {
       print('Error getting order: $e');
+      rethrow;
+    }
+  }
+
+  // Update order status (for admin use - with notification)
+  Future<bool> updateOrderStatus(String orderId, String newStatus) async {
+    try {
+      DocumentSnapshot doc =
+          await _firestore.collection(_ordersCollection).doc(orderId).get();
+
+      if (!doc.exists) {
+        throw Exception('Order not found');
+      }
+
+      Map<String, dynamic> orderData = doc.data() as Map<String, dynamic>;
+      String userId = orderData['userId'];
+      double total = (orderData['total'] as num).toDouble();
+
+      // Update order status
+      await _firestore.collection(_ordersCollection).doc(orderId).update({
+        'status': newStatus,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+
+      // Send notification to user about status change
+      await _notificationService.sendOrderStatusNotification(
+        userId: userId,
+        orderId: orderId,
+        newStatus: newStatus,
+        orderTotal: total.toStringAsFixed(2),
+      );
+
+      return true;
+    } catch (e) {
+      print('Error updating order status: $e');
       rethrow;
     }
   }
@@ -173,7 +227,7 @@ class OrderService {
     }
   }
 
-  // Cancel order (only if status is pending)
+  // Cancel order (only if status is pending) - with notification
   Future<bool> cancelOrder(String orderId) async {
     try {
       User? currentUser = _auth.currentUser;
@@ -205,6 +259,15 @@ class OrderService {
         'updatedAt': DateTime.now().toIso8601String(),
         'cancelledAt': DateTime.now().toIso8601String(),
       });
+
+      // Send cancellation notification
+      double total = (orderData['total'] as num).toDouble();
+      await _notificationService.sendOrderStatusNotification(
+        userId: currentUser.uid,
+        orderId: orderId,
+        newStatus: 'cancelled',
+        orderTotal: total.toStringAsFixed(2),
+      );
 
       return true;
     } catch (e) {
@@ -357,6 +420,190 @@ class OrderService {
     } catch (e) {
       print('Error checking order modification rights: $e');
       return false;
+    }
+  }
+
+  // Admin function to get all orders (for admin dashboard)
+  Future<List<OrderModel>> getAllOrders() async {
+    try {
+      QuerySnapshot querySnapshot =
+          await _firestore
+              .collection(_ordersCollection)
+              .orderBy('createdAt', descending: true)
+              .get();
+
+      return querySnapshot.docs
+          .map(
+            (doc) =>
+                OrderModel.fromJson(doc.data() as Map<String, dynamic>, doc.id),
+          )
+          .toList();
+    } catch (e) {
+      print('Error getting all orders: $e');
+      rethrow;
+    }
+  }
+
+  // Admin function to get orders by status
+  Future<List<OrderModel>> getOrdersByStatus(String status) async {
+    try {
+      QuerySnapshot querySnapshot =
+          await _firestore
+              .collection(_ordersCollection)
+              .where('status', isEqualTo: status)
+              .orderBy('createdAt', descending: true)
+              .get();
+
+      return querySnapshot.docs
+          .map(
+            (doc) =>
+                OrderModel.fromJson(doc.data() as Map<String, dynamic>, doc.id),
+          )
+          .toList();
+    } catch (e) {
+      print('Error getting orders by status: $e');
+      rethrow;
+    }
+  }
+
+  // Admin function to listen to all orders
+  Stream<List<OrderModel>> listenToAllOrders() {
+    return _firestore
+        .collection(_ordersCollection)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((querySnapshot) {
+          return querySnapshot.docs
+              .map(
+                (doc) => OrderModel.fromJson(
+                  doc.data() as Map<String, dynamic>,
+                  doc.id,
+                ),
+              )
+              .toList();
+        });
+  }
+
+  Future<void> checkAndCreateMissingNotifications() async {
+    try {
+      User? currentUser = _auth.currentUser;
+      if (currentUser == null) return;
+
+      print('🔍 Checking for missing notifications...');
+
+      // Get all user orders
+      QuerySnapshot orderSnapshot =
+          await _firestore
+              .collection(_ordersCollection)
+              .where('userId', isEqualTo: currentUser.uid)
+              .get();
+
+      // Get existing notifications
+      QuerySnapshot notificationSnapshot =
+          await _firestore
+              .collection('notifications')
+              .where('userId', isEqualTo: currentUser.uid)
+              .where('type', isEqualTo: 'order_status')
+              .get();
+
+      // Create map of existing notifications by orderId + status
+      Set<String> existingNotifications = {};
+      for (var doc in notificationSnapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        String key = '${data['orderId']}_${data['orderStatus']}';
+        existingNotifications.add(key);
+      }
+
+      // Check each order for missing notifications
+      for (var orderDoc in orderSnapshot.docs) {
+        final orderData = orderDoc.data() as Map<String, dynamic>;
+        final orderId = orderDoc.id;
+        final currentStatus = orderData['status'];
+        final orderTotal = orderData['total'];
+
+        // Check if notification exists for current status
+        String notificationKey = '${orderId}_${currentStatus}';
+
+        if (!existingNotifications.contains(notificationKey) &&
+            currentStatus != 'pending') {
+          print(
+            '📱 Creating missing notification for order $orderId status: $currentStatus',
+          );
+
+          // Create missing notification
+          await _notificationService.createNotification(
+            userId: currentUser.uid,
+            title: _getStatusTitle(currentStatus),
+            message: _getStatusMessage(
+              currentStatus,
+              orderId,
+              orderTotal.toString(),
+            ),
+            type: 'order_status',
+            orderId: orderId,
+            orderStatus: currentStatus,
+            additionalData: {
+              'orderTotal': orderTotal.toString(),
+              'createdFrom': 'status_check',
+              'originalOrderTime': orderData['createdAt'],
+            },
+          );
+
+          // Send local notification
+          await NotificationServices.showInstantNotification(
+            title: _getStatusTitle(currentStatus),
+            body: _getStatusMessage(
+              currentStatus,
+              orderId,
+              orderTotal.toString(),
+            ),
+          );
+
+          print('✅ Created notification for $orderId - $currentStatus');
+        }
+      }
+
+      print('🎉 Notification check completed!');
+    } catch (e) {
+      print('Error checking missing notifications: $e');
+    }
+  }
+
+  // Helper methods for notification content
+  String _getStatusTitle(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return '✅ Order Confirmed!';
+      case 'preparing':
+        return '👨‍🍳 Kitchen is Preparing Your Order';
+      case 'out_for_delivery':
+        return '🚀 Order Out for Delivery';
+      case 'delivered':
+        return '🎉 Order Delivered Successfully';
+      case 'cancelled':
+        return '❌ Order Cancelled';
+      default:
+        return '📦 Order Status Updated';
+    }
+  }
+
+  String _getStatusMessage(String status, String orderId, String total) {
+    String shortOrderId =
+        orderId.length > 8 ? orderId.substring(0, 8) : orderId;
+
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'Great! Your order #$shortOrderId worth ₹$total has been confirmed. We\'ll start preparing it soon.';
+      case 'preparing':
+        return 'Our chefs are carefully preparing your order #$shortOrderId. It will be ready soon!';
+      case 'out_for_delivery':
+        return 'Your order #$shortOrderId is on its way! Expected delivery in 20-30 minutes.';
+      case 'delivered':
+        return 'Your order #$shortOrderId has been delivered successfully. Enjoy your meal! 🍽️';
+      case 'cancelled':
+        return 'Your order #$shortOrderId has been cancelled. If you have any questions, please contact support.';
+      default:
+        return 'Your order #$shortOrderId status has been updated to $status.';
     }
   }
 }

@@ -8,6 +8,7 @@ import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/resturant_page.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
+import 'package:the_tumeric_papplication/test/notification_test.widget.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 import 'package:the_tumeric_papplication/widgets/profile_page_tabs.dart';
 import 'package:the_tumeric_papplication/widgets/profile_picture_widget.dart'; // Import the profile picture widget
@@ -258,6 +259,19 @@ class _ProfilePageState extends State<ProfilePage> {
                   subtitle: 'Sign out of your account',
                   onTap: () => _showLogoutDialog(context),
                   isLogout: true,
+                ),
+                _buildMenuCard(
+                  context,
+                  icon: Icons.history,
+                  title: 'Check Notify',
+                  subtitle: 'Contact Our Resturant',
+                  onTap:
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NotificationTestPage(),
+                        ),
+                      ),
                 ),
 
                 const SizedBox(height: 20),

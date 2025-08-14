@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:the_tumeric_papplication/main.dart';
 
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 import 'package:the_tumeric_papplication/models/user_model.dart';
@@ -161,7 +162,7 @@ class _CartPageState extends State<CartPage> {
 
   // Navigate to sign in page (replace with your actual sign in route)
   void _navigateToSignIn() {
-    GoRouter.of(context).push("/auth/signin");
+    context.goToSignIn();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Navigate to Sign In page'),
@@ -813,12 +814,14 @@ class _CartPageState extends State<CartPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.green[100],
+                      color: Colors.green.withOpacity(
+                        0.1,
+                      ), // Use Colors.green directly
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.check_circle,
-                      color: Colors.green[600],
+                      color: Colors.green, // Use Colors.green directly
                       size: 48,
                     ),
                   ),
@@ -843,16 +846,20 @@ class _CartPageState extends State<CartPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green[50],
+                        color: Colors.green.withOpacity(
+                          0.1,
+                        ), // Use Colors.green directly
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.green[200]!),
+                        border: Border.all(
+                          color: Colors.green.withOpacity(0.2),
+                        ), // Use Colors.green directly
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(
                             Icons.savings,
-                            color: Colors.green[600],
+                            color: Colors.green, // Use Colors.green directly
                             size: 20,
                           ),
                           const SizedBox(width: 8),
@@ -861,7 +868,7 @@ class _CartPageState extends State<CartPage> {
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: Colors.green[600],
+                              color: Colors.green, // Use Colors.green directly
                             ),
                           ),
                         ],
@@ -880,46 +887,30 @@ class _CartPageState extends State<CartPage> {
             actions: [
               Container(
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green[400]!, Colors.green[600]!],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextButton(
+                child: ElevatedButton(
+                  // Changed to ElevatedButton
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) {
-                          return HomePage();
-                        },
-                      ),
-                    );
+                    context.goToHome();
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green, // Use Colors.green directly
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                   child: const Text(
                     'Continue Shopping',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
-              SizedBox(height: 15),
+              const SizedBox(height: 15),
               Container(
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.orangeAccent[400]!,
-                      Colors.orangeAccent[600]!,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextButton(
+                child: ElevatedButton(
+                  // Changed to ElevatedButton
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -930,13 +921,17 @@ class _CartPageState extends State<CartPage> {
                       ),
                     );
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kMainOrange, // Use kMainOrange
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                   child: const Text(
                     'View Your Order',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -1242,10 +1237,7 @@ class _CartPageState extends State<CartPage> {
             children: [
               OutlinedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => HomePage()),
-                  );
+                  context.goToHome();
                 },
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: kMainOrange),
@@ -1385,14 +1377,7 @@ class _CartPageState extends State<CartPage> {
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) {
-                                return HomePage();
-                              },
-                            ),
-                          );
+                          context.goToHome();
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kMainOrange,
