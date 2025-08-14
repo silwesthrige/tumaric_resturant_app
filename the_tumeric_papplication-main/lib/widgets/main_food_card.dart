@@ -3,9 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 import 'package:the_tumeric_papplication/services/cart_service.dart';
 
-import 'package:the_tumeric_papplication/services/food_services.dart';
-import 'package:the_tumeric_papplication/services/user_services.dart';
-
 class MainFoodCard extends StatefulWidget {
   final FoodDetailModel food;
   final String title;
@@ -49,6 +46,13 @@ class _MainFoodCardState extends State<MainFoodCard>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
+    // Debug: Print food data when card initializes
+    print('🍽️ MainFoodCard initialized with:');
+    print('   - Food ID: "${widget.food.foodId}"');
+    print('   - Food Name: "${widget.food.foodName}"');
+    print('   - Title: "${widget.title}"');
+    print('   - Price: ${widget.price}');
+
     // Check cart status when widget initializes
     _checkCartStatus();
   }
@@ -82,16 +86,26 @@ class _MainFoodCardState extends State<MainFoodCard>
   Future<void> _checkCartStatus() async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid != null && widget.food.foodId != null) {
+      print('🛒 Checking cart status:');
+      print('   - User ID: $uid');
+      print('   - Food ID: "${widget.food.foodId}"');
+
+      if (uid != null &&
+          widget.food.foodId != null &&
+          widget.food.foodId!.isNotEmpty) {
         final inCart = await _cartService.isInCart(uid, widget.food.foodId!);
+        print('   - In cart: $inCart');
+
         if (mounted) {
           setState(() {
             isInCart = inCart;
           });
         }
+      } else {
+        print('   - Cannot check cart: Missing UID or Food ID');
       }
     } catch (e) {
-      print('Error checking cart status: $e');
+      print('❌ Error checking cart status: $e');
     }
   }
 
@@ -109,7 +123,12 @@ class _MainFoodCardState extends State<MainFoodCard>
 
   @override
   Widget build(BuildContext context) {
-    final String uid = FirebaseAuth.instance.currentUser!.uid;
+    // Debug: Check if we have required data
+    if (widget.food.foodId == null || widget.food.foodId!.isEmpty) {
+      print('⚠️ WARNING: MainFoodCard has null or empty foodId!');
+      print('   Food data: ${widget.food.toJson()}');
+    }
+
     return GestureDetector(
       onTap: widget.ontap,
       onTapDown: _onTapDown,
@@ -327,37 +346,96 @@ class _MainFoodCardState extends State<MainFoodCard>
                           isLoading
                               ? null
                               : () async {
-                                if (widget.food.foodId == null) return;
+                                print('🛒 Cart button tapped');
+
+                                // Better check: Ensure we have valid foodId
+                                if (widget.food.foodId == null ||
+                                    widget.food.foodId!.trim().isEmpty) {
+                                  print(
+                                    '❌ Cannot add to cart: Invalid food ID',
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Error: Invalid food item'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                final uid =
+                                    FirebaseAuth.instance.currentUser?.uid;
+                                if (uid == null) {
+                                  print(
+                                    '❌ Cannot add to cart: User not logged in',
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please log in to add items to cart',
+                                      ),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
 
                                 setState(() {
                                   isLoading = true;
                                 });
 
                                 try {
+                                  final foodId = widget.food.foodId!.trim();
+                                  print(
+                                    '🛒 ${isInCart ? "Removing from" : "Adding to"} cart: $foodId',
+                                  );
+
                                   if (isInCart) {
                                     await _cartService.removeFromCart(
                                       context,
-                                      widget.food.foodId!.trim(),
+                                      foodId,
                                     );
                                   } else {
                                     await _cartService.addToCart(
                                       context,
-                                      widget.food.foodId!.trim(),
+                                      foodId,
                                     );
                                   }
 
-                                  // Update the local state
                                   setState(() {
                                     isInCart = !isInCart;
                                   });
+
+                                  print('✅ Cart operation successful');
+
+                                  // Show success message
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isInCart
+                                            ? '${widget.title} added to cart'
+                                            : '${widget.title} removed from cart',
+                                      ),
+                                      backgroundColor: Colors.green,
+                                      duration: const Duration(seconds: 2),
+                                    ),
+                                  );
                                 } catch (e) {
-                                  print('Error updating cart: $e');
-                                  // Recheck cart status on error
-                                  _checkCartStatus();
+                                  print('❌ Error updating cart: $e');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: ${e.toString()}'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  // Refresh cart status on error
+                                  await _checkCartStatus();
                                 } finally {
-                                  setState(() {
-                                    isLoading = false;
-                                  });
+                                  if (mounted) {
+                                    setState(() {
+                                      isLoading = false;
+                                    });
+                                  }
                                 }
                               },
                       child: AnimatedContainer(

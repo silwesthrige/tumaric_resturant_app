@@ -4,6 +4,8 @@ import 'package:the_tumeric_papplication/pages/home_page.dart';
 import 'package:the_tumeric_papplication/services/cart_service.dart';
 import 'package:the_tumeric_papplication/services/rating_service.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
+// Add your authentication service import here
+// import 'package:the_tumeric_papplication/services/auth_service.dart';
 
 class MainFoodDiscPage extends StatefulWidget {
   final String foodId;
@@ -55,6 +57,181 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
     );
     _controller.forward();
     _loadRatingData();
+  }
+
+  // Method to check if user is logged in
+  // Replace this with your actual authentication check
+  bool _isUserLoggedIn() {
+    // Example implementations:
+    // return AuthService().isLoggedIn();
+    // return FirebaseAuth.instance.currentUser != null;
+    // return UserPreferences.isLoggedIn();
+
+    // For now, return false to test the popup
+    // Change this to your actual authentication check
+    return false; // Replace with actual login check
+  }
+
+  // Method to show login dialog
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Colors.white, Colors.orange[50]!],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icon
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [kMainOrange, kMainOrange.withOpacity(0.8)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: kMainOrange.withOpacity(0.3),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                // Title
+                Text(
+                  'Login Required',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: kmainBlack,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Message
+                Text(
+                  'Please login or sign up to add items to your cart and enjoy our delicious meals!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: kmainBlack.withOpacity(0.7),
+                    height: 1.4,
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Buttons
+                Row(
+                  children: [
+                    // Sign Up Button
+                    Expanded(
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: kMainOrange, width: 2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            // Navigate to sign up page
+                            // Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpPage()));
+                            print('Navigate to Sign Up');
+                          },
+                          child: Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              color: kMainOrange,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+
+                    // Login Button
+                    Expanded(
+                      child: Container(
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [kMainOrange, kMainOrange.withOpacity(0.8)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: kMainOrange.withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            // Navigate to login page
+                            // Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage()));
+                            print('Navigate to Login');
+                          },
+                          child: const Text(
+                            'Login',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // Close Button
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Maybe Later',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadRatingData() async {
@@ -969,6 +1146,13 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
                       _rating > 0
                           ? () async {
                             if (!isSubmitting) {
+                              // Check if user is logged in before submitting rating
+                              if (!_isUserLoggedIn()) {
+                                // Show login dialog if not logged in
+                                _showLoginDialog();
+                                return;
+                              }
+
                               setButtonState(() {
                                 isSubmitting = true;
                               });
@@ -1474,6 +1658,14 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
+                  // Check if user is logged in
+                  if (!_isUserLoggedIn()) {
+                    // Show login dialog if not logged in
+                    _showLoginDialog();
+                    return;
+                  }
+
+                  // If logged in, proceed with normal add to cart
                   CartService().addToCart(
                     context,
                     widget.foodId,

@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:the_tumeric_papplication/models/food_detail_model.dart';
 import 'package:the_tumeric_papplication/pages/main_food_disc_page.dart';
+import 'package:the_tumeric_papplication/services/catogary_service.dart';
 import 'package:the_tumeric_papplication/services/food_services.dart';
 import 'package:the_tumeric_papplication/services/rating_service.dart';
 import 'package:the_tumeric_papplication/widgets/main_food_card.dart';
@@ -19,6 +21,7 @@ class _AllFoodsPageState extends State<AllFoodsPage>
 
   final FoodServices _foodServices = FoodServices();
   final RatingService _ratingService = RatingService();
+  final CatogaryService _catogaryService = CatogaryService();
 
   String _sortBy = 'name'; // 'name', 'rating', 'price_low', 'price_high'
   String _searchQuery = '';
@@ -231,7 +234,7 @@ class _AllFoodsPageState extends State<AllFoodsPage>
 
   Widget _buildFoodsList() {
     return StreamBuilder<List<FoodDetailModel>>(
-      stream: _foodServices.getFood(),
+      stream: _catogaryService.getFoodsSafe(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return _buildLoadingGrid();

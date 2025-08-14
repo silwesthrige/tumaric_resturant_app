@@ -7,6 +7,7 @@ import 'package:the_tumeric_papplication/pages/profile_pages/feedback_page.dart'
 import 'package:the_tumeric_papplication/pages/profile_pages/orders_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/profile_details_page.dart';
 import 'package:the_tumeric_papplication/pages/profile_pages/resturant_page.dart';
+import 'package:the_tumeric_papplication/services/catogary_service.dart';
 import 'package:the_tumeric_papplication/services/user_services.dart'; // Adjust path
 import 'package:the_tumeric_papplication/test/notification_test.widget.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
@@ -360,7 +361,13 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
 
             const SizedBox(height: 20),
-
+            ElevatedButton(
+              onPressed: () async {
+                final service = CatogaryService();
+                await service.manualDebugFirestore();
+              },
+              child: Text('Debug Firestore'),
+            ),
             // Register option
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
