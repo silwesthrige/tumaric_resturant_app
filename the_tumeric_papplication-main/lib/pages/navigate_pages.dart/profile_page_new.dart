@@ -360,14 +360,6 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
 
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
-                final service = CatogaryService();
-                await service.manualDebugFirestore();
-              },
-              child: Text('Debug Firestore'),
-            ),
             // Register option
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

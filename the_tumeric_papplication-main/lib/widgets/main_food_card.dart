@@ -320,7 +320,7 @@ class _MainFoodCardState extends State<MainFoodCard>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Text(
-                            "\$",
+                            "£",
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,

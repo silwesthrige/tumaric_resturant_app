@@ -296,7 +296,7 @@ class _OrdersPageState extends State<OrdersPage>
                         ),
                       ),
                       Text(
-                        '\$${total.toStringAsFixed(2)}',
+                        '£${total.toStringAsFixed(2)}',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -343,7 +343,7 @@ class _OrdersPageState extends State<OrdersPage>
                       ),
                     ),
                     Text(
-                      '\$${(item['price'] * item['qty']).toStringAsFixed(2)}',
+                      '£${(item['price'] * item['qty']).toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontWeight: FontWeight.w500,
                         fontSize: 14,

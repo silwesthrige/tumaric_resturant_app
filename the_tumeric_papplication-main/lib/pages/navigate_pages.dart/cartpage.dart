@@ -368,7 +368,7 @@ class _CartPageState extends State<CartPage> {
       });
 
       print(
-        'Calculated discount: \$${discount.toStringAsFixed(2)} for offer: ${_selectedOffer!.discountText}',
+        'Calculated discount: £${discount.toStringAsFixed(2)} for offer: ${_selectedOffer!.discountText}',
       );
     } else {
       setState(() {
@@ -503,7 +503,7 @@ class _CartPageState extends State<CartPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Save \$${discount.toStringAsFixed(2)}',
+                                    'Save £${discount.toStringAsFixed(2)}',
                                     style: TextStyle(
                                       fontWeight: FontWeight.w600,
                                       color: Colors.green[600],
@@ -993,7 +993,7 @@ class _CartPageState extends State<CartPage> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'You saved \$${savedAmount.toStringAsFixed(2)}!',
+                            'You saved £${savedAmount.toStringAsFixed(2)}!',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1817,7 +1817,7 @@ class _CartPageState extends State<CartPage> {
                                                     ),
                                                   ),
                                                   Text(
-                                                    'You save \$${_discountAmount.toStringAsFixed(2)}',
+                                                    'You save £${_discountAmount.toStringAsFixed(2)}',
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       color: Colors.green[600],
@@ -1910,7 +1910,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ),
                                 Text(
-                                  "\$${totalPrice.toStringAsFixed(2)}",
+                                  "£${totalPrice.toStringAsFixed(2)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1932,7 +1932,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ),
                                 Text(
-                                  "\$${tax.toStringAsFixed(2)}",
+                                  "£${tax.toStringAsFixed(2)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1954,7 +1954,7 @@ class _CartPageState extends State<CartPage> {
                                   ),
                                 ),
                                 Text(
-                                  "\$${deliveryFee.toStringAsFixed(2)}",
+                                  "£${deliveryFee.toStringAsFixed(2)}",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -1979,7 +1979,7 @@ class _CartPageState extends State<CartPage> {
                                     ),
                                   ),
                                   Text(
-                                    "-\$${_discountAmount.toStringAsFixed(2)}",
+                                    "-£${_discountAmount.toStringAsFixed(2)}",
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -2010,7 +2010,7 @@ class _CartPageState extends State<CartPage> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      "\$${finalTotal.toStringAsFixed(2)}",
+                                      "£${finalTotal.toStringAsFixed(2)}",
                                       style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w800,
@@ -2019,7 +2019,7 @@ class _CartPageState extends State<CartPage> {
                                     ),
                                     if (_discountAmount > 0)
                                       Text(
-                                        "You saved \$${_discountAmount.toStringAsFixed(2)}!",
+                                        "You saved £${_discountAmount.toStringAsFixed(2)}!",
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.green[600],

@@ -178,7 +178,7 @@ class _CaertAddCardState extends State<CaertAddCard>
                                 horizontal: 12,
                               ),
                               child: Text(
-                                "\$${widget.price.toStringAsFixed(2)}", // Use widget.price
+                                "£${widget.price.toStringAsFixed(2)}", // Use widget.price
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w800,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:the_tumeric_papplication/main.dart';
 import 'package:the_tumeric_papplication/pages/home_page.dart';
 import 'package:the_tumeric_papplication/services/cart_service.dart';
 import 'package:the_tumeric_papplication/services/rating_service.dart';
@@ -160,8 +161,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
                         child: TextButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            // Navigate to sign up page
-                            // Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpPage()));
+                            context.goToSignUp();
                             print('Navigate to Sign Up');
                           },
                           child: Text(
@@ -198,6 +198,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
                         child: TextButton(
                           onPressed: () {
                             Navigator.of(context).pop();
+                            context.goToSignIn();
                             // Navigate to login page
                             // Navigator.push(context, MaterialPageRoute(builder: (context) => LoginPage()));
                             print('Navigate to Login');
@@ -888,7 +889,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
         ],
       ),
       child: Text(
-        '\$${widget.price.toStringAsFixed(2)}',
+        '£${widget.price.toStringAsFixed(2)}',
         style: const TextStyle(
           fontSize: 20,
           fontWeight: FontWeight.w800,
@@ -1684,7 +1685,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Added \$${quantity}x ${widget.title} to cart!',
+                              'Added £${quantity}x ${widget.title} to cart!',
                               style: const TextStyle(
                                 fontWeight: FontWeight.w600,
                               ),
@@ -1718,7 +1719,7 @@ class _MainFoodDiscPageState extends State<MainFoodDiscPage>
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          'Add \$${(widget.price * quantity).toStringAsFixed(2)}',
+                          'Add £${(widget.price * quantity).toStringAsFixed(2)}',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,

@@ -281,14 +281,7 @@ class _HomePageBottumState extends State<HomePageBottum>
           ),
         ),
       ),
-      leading: Container(
-        margin: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(Icons.menu, color: Colors.white),
-      ),
+      automaticallyImplyLeading: false,
       actions: [
         // Notification icon with badge
         Container(

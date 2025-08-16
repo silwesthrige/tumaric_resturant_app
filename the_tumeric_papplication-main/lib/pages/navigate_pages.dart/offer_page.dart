@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:the_tumeric_papplication/main.dart';
 import 'package:the_tumeric_papplication/services/promotion_services.dart';
 import 'package:the_tumeric_papplication/utils/colors.dart';
 import 'package:the_tumeric_papplication/models/promotion_model.dart';
@@ -457,7 +458,7 @@ class _OfferPageState extends State<OfferPage> {
                 Expanded(
                   child: TextButton(
                     onPressed: () {
-                      GoRouter.of(context).push("/auth/signup");
+                      context.goToSignUp();
                       // Navigate to signup page
                       _navigateToAuth(context, isLogin: false);
                     },
