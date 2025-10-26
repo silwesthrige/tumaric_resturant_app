@@ -1,4 +1,4 @@
-# the_tumeric_Aapplication
+# the_tumeric_Application
 
 🍛 Tumaric Restaurant App
 
